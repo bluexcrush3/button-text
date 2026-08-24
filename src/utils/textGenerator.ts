@@ -54,11 +54,41 @@ export function formatDamageValue(val: number): string {
   return `${val}`;
 }
 
-/**
- * 全選択情報からグループ間をスラッシュ '/' で連結した文字列を生成
- * (①場所 / ②方向 / ③箇所 / ④損傷)
- */
 export function generateLineText(selection: LineSelection): string {
+  // 調査モードが「内部」の場合
+  if (selection.mode === '内部') {
+    const parts: string[] = [];
+    if (selection.internalSelections && selection.internalSelections.length > 0) {
+      const formattedItems = selection.internalSelections.map((btnName) => {
+        const dmgInfo = (selection.internalDamages || []).find((d) => d.name === btnName);
+        if (!dmgInfo) return btnName;
+
+        if (dmgInfo.preset) {
+          return `${btnName}${dmgInfo.preset}`;
+        }
+        const wVal = dmgInfo.valueW ?? 0;
+        const lVal = dmgInfo.valueL ?? 0;
+        let valStr = '';
+        if (wVal > 0 && lVal > 0) {
+          valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+        } else if (wVal > 0) {
+          valStr = `W${formatDamageValue(wVal)}`;
+        } else if (lVal > 0) {
+          valStr = `L${formatDamageValue(lVal)}`;
+        }
+        return `${btnName}${valStr}`;
+      });
+      parts.push(...formattedItems);
+    }
+    if (selection.situationButton) {
+      parts.push(selection.situationButton);
+    }
+    if (selection.situationText && selection.situationText.trim()) {
+      parts.push(selection.situationText.trim());
+    }
+    return parts.join('/');
+  }
+
   const parts: string[] = [];
 
   // ① 場所グループ

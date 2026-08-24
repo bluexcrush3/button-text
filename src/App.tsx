@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { TabData, BasicInfo, LineData, LineSelection } from './types';
+import { TabData, BasicInfo, LineData, LineSelection, SurveyType, CustomButtonConfig } from './types';
 import { Header } from './components/Header';
 import { MainArea } from './components/MainArea';
 import { BasicInfoModal } from './components/BasicInfoModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AllTextModal } from './components/AllTextModal';
+import { AllTextPreviewPanel } from './components/AllTextPreviewPanel';
 
 const STORAGE_KEY_TABS = 'btn_text_gen_tabs_v4';
 const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
+const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
 
-const createInitialSelection = (): LineSelection => ({
+const DEFAULT_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+  { id: 'btn-1', name: '床きしみ', category: '損傷' },
+  { id: 'btn-2', name: '建具すれ', category: '損傷' },
+  { id: 'btn-3', name: 'クロス隙間', category: '損傷' },
+  { id: 'btn-4', name: '畳隙間', category: '損傷' },
+  { id: 'btn-5', name: '襖開閉不良', category: '損傷' },
+  { id: 'btn-6', name: 'サッシ建付調整', category: '損傷' },
+  { id: 'btn-7', name: '床鳴り', category: '損傷' },
+  { id: 'btn-8', name: '傾斜不良', category: '損傷' },
+  { id: 'btn-9', name: '和室', category: '場所' },
+  { id: 'btn-10', name: '洋室', category: '場所' },
+];
+
+const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelection => ({
+  mode: defaultMode,
   location: {
     isBuilding: true, // 建物ボタンはデフォルトで選択状態
     floor1: 1,        // デフォルトで 1
@@ -20,24 +36,29 @@ const createInitialSelection = (): LineSelection => ({
   damages: [],
   situationButton: '現況', // デフォルトで 現況
   situationText: '',
+  internalSelections: [],
+  internalDamages: [],
 });
 
-const createInitialLine = (): LineData => ({
+const createInitialLine = (defaultMode: SurveyType = '外部'): LineData => ({
   id: `line-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-  selection: createInitialSelection(),
+  selection: createInitialSelection(defaultMode),
 });
 
-const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData => ({
-  id,
-  basicInfo: basicInfo || {
-    houseNumber: 1,
-    surveyType: '外部',
-    investigator: '山本',
-    folderNumber: 1,
-  },
-  lines: [createInitialLine()],
-  currentLineIndex: 0,
-});
+const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData => {
+  const defaultMode = basicInfo?.surveyType || '外部';
+  return {
+    id,
+    basicInfo: basicInfo || {
+      houseNumber: 1,
+      surveyType: '外部',
+      investigator: '山本',
+      folderNumber: 1,
+    },
+    lines: [createInitialLine(defaultMode)],
+    currentLineIndex: 0,
+  };
+};
 
 export const App: React.FC = () => {
   // localStorageからの復元
@@ -63,6 +84,37 @@ export const App: React.FC = () => {
     }
     return 'tab-1';
   });
+
+  const [customButtons, setCustomButtons] = useState<CustomButtonConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_CUSTOM_BUTTONS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // 文字列配列だった場合の自動移行
+          if (typeof parsed[0] === 'string') {
+            return parsed.map((name: string, i: number) => ({
+              id: `btn-${Date.now()}-${i}`,
+              name,
+              category: '損傷',
+            }));
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load custom buttons', e);
+    }
+    return DEFAULT_CUSTOM_BUTTONS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_CUSTOM_BUTTONS, JSON.stringify(customButtons));
+    } catch (e) {
+      console.error('Failed to save custom buttons', e);
+    }
+  }, [customButtons]);
 
   // モーダル表示状態
   const [isBasicInfoOpen, setIsBasicInfoOpen] = useState(false);
@@ -91,6 +143,13 @@ export const App: React.FC = () => {
   const currentLine = activeTab?.lines[activeTab.currentLineIndex] || {
     id: 'default',
     selection: createInitialSelection(),
+  };
+
+  const currentSelection: LineSelection = {
+    ...currentLine.selection,
+    mode: currentLine.selection.mode || activeTab?.basicInfo.surveyType || '外部',
+    internalSelections: currentLine.selection.internalSelections || [],
+    internalDamages: currentLine.selection.internalDamages || [],
   };
 
   // タブ追加
@@ -126,7 +185,7 @@ export const App: React.FC = () => {
       setTabs([
         {
           ...activeTab,
-          lines: [createInitialLine()],
+          lines: [createInitialLine(activeTab?.basicInfo.surveyType)],
           currentLineIndex: 0,
         },
       ]);
@@ -182,7 +241,7 @@ export const App: React.FC = () => {
       prev.map((t) => {
         if (t.id !== activeTabId) return t;
 
-        const newLine = createInitialLine();
+        const newLine = createInitialLine(t.basicInfo.surveyType);
         const updatedLines = [...t.lines];
         const insertIndex = t.currentLineIndex + 1;
         updatedLines.splice(insertIndex, 0, newLine);
@@ -215,7 +274,7 @@ export const App: React.FC = () => {
         const updatedLines = [...t.lines];
         updatedLines[t.currentLineIndex] = {
           ...updatedLines[t.currentLineIndex],
-          selection: createInitialSelection(),
+          selection: createInitialSelection(t.basicInfo.surveyType),
         };
 
         return {
@@ -233,9 +292,9 @@ export const App: React.FC = () => {
       prev.map((t) =>
         t.id === activeTabId
           ? {
-              ...t,
-              currentLineIndex: t.currentLineIndex - 1,
-            }
+            ...t,
+            currentLineIndex: t.currentLineIndex - 1,
+          }
           : t
       )
     );
@@ -251,7 +310,7 @@ export const App: React.FC = () => {
 
         const isLastLine = t.currentLineIndex === t.lines.length - 1;
         if (isLastLine) {
-          const newLine = createInitialLine();
+          const newLine = createInitialLine(t.basicInfo.surveyType);
           return {
             ...t,
             lines: [...t.lines, newLine],
@@ -288,12 +347,22 @@ export const App: React.FC = () => {
 
       {/* メイン操作エリア */}
       {activeTab && (
-        <MainArea
-          surveyType={activeTab.basicInfo.surveyType}
-          selection={currentLine.selection}
-          onChangeSelection={handleChangeSelection}
-          onClearCurrentLine={handleClearCurrentLine}
-        />
+        <>
+          <MainArea
+            surveyType={activeTab.basicInfo.surveyType}
+            selection={currentSelection}
+            onChangeSelection={handleChangeSelection}
+            onClearCurrentLine={handleClearCurrentLine}
+            customButtons={customButtons}
+            onChangeCustomButtons={setCustomButtons}
+          />
+          {/* TOP画面最下部: 全行プレビューエリア */}
+          <AllTextPreviewPanel
+            lines={activeTab.lines}
+            currentLineIndex={activeTab.currentLineIndex}
+            onNavigateToLine={handleNavigateToLine}
+          />
+        </>
       )}
 
       {/* モーダル: 基本情報 */}

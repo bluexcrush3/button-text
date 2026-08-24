@@ -88,31 +88,35 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2行目: 前へ / 文字列表示 / 次へ / 確認ボタン */}
-      <div className="header-row-2">
+      {/* 2行目: テキスト表示エリア単体 */}
+      <div className="header-row-text">
+        <div className="generated-text-box" style={{ width: '100%' }}>
+          {currentLineText || <span style={{ color: '#aaa', fontWeight: 'normal' }}>（ボタンを選択してください）</span>}
+        </div>
+      </div>
+
+      {/* 3行目: 前へ / 次へ / 確認ボタン & 現在地表示 */}
+      <div className="header-row-navigation">
         <button
           type="button"
           className="nav-btn"
           onClick={onPrevLine}
           disabled={!canPrev}
+          style={{ flex: 1 }}
         >
           <ChevronLeft size={18} />
           前へ
         </button>
 
-        <div className="generated-text-box" style={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
-          <div style={{ fontSize: '0.7rem', color: '#666', fontWeight: 'normal', lineHeight: '1' }}>
-            行 {currentLineNum} / {totalLines}
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 'bold', whiteSpace: 'nowrap', overflowX: 'auto', width: '100%' }}>
-            {currentLineText || <span style={{ color: '#aaa', fontWeight: 'normal' }}>（ボタンを選択してください）</span>}
-          </div>
+        <div className="line-indicator">
+          行 {currentLineNum} / {totalLines}
         </div>
 
         <button
           type="button"
           className="nav-btn"
           onClick={onNextLine}
+          style={{ flex: 1 }}
         >
           次へ
           <ChevronRight size={18} />
@@ -120,9 +124,8 @@ export const Header: React.FC<HeaderProps> = ({
 
         <button
           type="button"
-          className="nav-btn selected"
+          className="nav-btn selected confirm-btn"
           onClick={onOpenAllText}
-          style={{ padding: '8px 10px' }}
         >
           <Eye size={16} />
           確認

@@ -27,9 +27,14 @@ export interface DamageItem {
   value?: number; // 互換性用
 }
 
-/**
- * 1行のエントリの選択状態
- */
+export type CustomButtonCategory = '場所' | '損傷';
+
+export interface CustomButtonConfig {
+  id: string;
+  name: string;
+  category: CustomButtonCategory;
+}
+
 export interface LineSelection {
   location: LocationData;
   directions: string[];   // 方向: 最大2つ
@@ -37,6 +42,9 @@ export interface LineSelection {
   damages: DamageItem[];   // 損傷: 最大2つ、各数値(W/L)保持
   situationButton?: '全景' | '現況' | null; // 状況ボタン選択
   situationText?: string;                  // 状況テキスト入力
+  internalSelections?: string[]; // 内部モード用の選択されたカスタム文字列リスト
+  internalDamages?: DamageItem[]; // 内部モード用の損傷詳細情報
+  mode?: SurveyType;           // この行の個別調査モード
 }
 
 export interface LineData {

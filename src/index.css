@@ -4,7 +4,7 @@
   --border-color: #222222;
   --border-width: 2px;
   --border-radius: 8px;
-  
+
   --btn-bg: #f8f9fa;
   --btn-hover-bg: #e9ecef;
   --btn-active-bg: #de2e6;
@@ -20,7 +20,7 @@
 
   --header-bg: #ffffff;
   --modal-overlay: rgba(0, 0, 0, 0.5);
-  
+
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -45,7 +45,8 @@ body {
 
 #root {
   width: 100%;
-  max-width: 480px; /* スマホ縦持ち幅想定 */
+  max-width: 480px;
+  /* スマホ縦持ち幅想定 */
   min-height: 100vh;
   background-color: var(--bg-color);
   display: flex;
@@ -56,7 +57,8 @@ body {
 }
 
 /* ボタン基本スタイル - 全ボタンにしっかり外枠 */
-button, .btn {
+button,
+.btn {
   font-family: inherit;
   font-size: 1rem;
   font-weight: 600;
@@ -86,7 +88,8 @@ button:disabled {
 }
 
 /* 選択済みボタンのハイライト */
-button.selected, .btn.selected {
+button.selected,
+.btn.selected {
   background-color: var(--btn-selected-bg);
   color: var(--btn-selected-text);
   border-color: var(--btn-selected-bg);
@@ -138,6 +141,7 @@ button.btn-danger:active {
 .tab-list-container::-webkit-scrollbar {
   height: 4px;
 }
+
 .tab-list-container::-webkit-scrollbar-thumb {
   background: #ccc;
   border-radius: 2px;
@@ -186,21 +190,12 @@ button.btn-danger:active {
   padding: 6px 10px;
 }
 
-/* ヘッダー 2行目: 前へ / 次へ / 文字列表示 */
-.header-row-2 {
+/* ヘッダー 2行目: テキスト表示エリア単体 */
+.header-row-text {
   display: flex;
-  align-items: center;
-  gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid #e0e0e0;
-  background-color: #fafafa;
-}
-
-.nav-btn {
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  flex-shrink: 0;
+  background-color: #ffffff;
 }
 
 .generated-text-box {
@@ -218,6 +213,41 @@ button.btn-danger:active {
   overflow-x: auto;
   white-space: nowrap;
   color: #000000;
+}
+
+/* ヘッダー 3行目: 前へ / 次へ / 確認ボタン & 現在地表示 */
+.header-row-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #fafafa;
+}
+
+.nav-btn {
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.header-row-navigation .confirm-btn {
+  padding: 8px 14px;
+}
+
+.line-indicator {
+  font-size: 0.9rem;
+  color: #666666;
+  font-weight: bold;
+  white-space: nowrap;
+  padding: 0 8px;
+  min-width: 80px;
+  text-align: center;
 }
 
 /* ヘッダー 3行目: 基本情報サマリー ＆ 「前回と同じ」ボタン */
@@ -326,8 +356,13 @@ button.btn-danger:active {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-card {
@@ -382,13 +417,13 @@ button.btn-danger:active {
 .number-stepper {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .stepper-btn {
-  width: 36px;
-  height: 38px;
-  font-size: 1.2rem;
+  width: 30px;
+  height: 34px;
+  font-size: 0.95rem;
   font-weight: bold;
   padding: 0;
   flex-shrink: 0;
@@ -396,14 +431,15 @@ button.btn-danger:active {
 
 .stepper-input {
   flex: 1;
-  height: 38px;
+  height: 34px;
   text-align: center;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: bold;
   border: 2px solid var(--border-color);
   border-radius: var(--border-radius);
   outline: none;
   min-width: 0;
+  padding: 0 2px;
 }
 
 .survey-toggle-group {
@@ -442,4 +478,38 @@ button.btn-danger:active {
 .modal-footer button {
   flex: 1;
   padding: 10px;
+}
+
+/* 内部モード・カスタムボタン ドラッグ＆ドロップ & バッジ用スタイル */
+.custom-btn-item {
+  user-select: none;
+  touch-action: manipulation;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.custom-btn-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-style: dashed !important;
+}
+
+.category-badge {
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.category-badge.category-location {
+  background-color: #e7f5ff;
+  color: #1c7ed6;
+  border: 1px solid #74c0fc;
+}
+
+.category-badge.category-damage {
+  background-color: #fff0f6;
+  color: #d6336c;
+  border: 1px solid #fcc2d7;
 }

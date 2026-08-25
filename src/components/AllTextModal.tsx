@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { LineData } from '../types';
-import { generateLineText } from '../utils/textGenerator';
+import { LineData, CustomButtonConfig } from '../types';
+import { generateLineText, generateLineTextForSpreadsheet } from '../utils/textGenerator';
 import { FileText, Copy, Check, X } from 'lucide-react';
 
 interface AllTextModalProps {
@@ -10,6 +10,7 @@ interface AllTextModalProps {
   houseNumber: number;
   currentLineIndex?: number;
   onNavigateToLine?: (index: number) => void;
+  customButtons?: CustomButtonConfig[];
 }
 
 export const AllTextModal: React.FC<AllTextModalProps> = ({
@@ -19,18 +20,23 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
   houseNumber,
   currentLineIndex,
   onNavigateToLine,
+  customButtons = [],
 }) => {
   const [copied, setCopied] = useState(false);
 
   if (!isOpen) return null;
 
   // 全行のテキストリストを生成
-  const lineTexts = lines.map((line) => generateLineText(line.selection));
+  const lineTexts = lines.map((line) => generateLineText(line.selection, customButtons));
   const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(fullText);
+      const copyText = lines
+        .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons))
+        .filter((t) => t.trim().length > 0)
+        .join('\n');
+      await navigator.clipboard.writeText(copyText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {

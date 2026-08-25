@@ -317,7 +317,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
   const handleToggleCategory = (id: string) => {
     const updated = customButtons.map((btn) => {
       if (btn.id === id) {
-        const nextCat: CustomButtonCategory = btn.category === '損傷' ? '場所' : '損傷';
+        const categories: CustomButtonCategory[] = ['損傷', '場所', '階数', '箇所'];
+        const currentIdx = categories.indexOf(btn.category || '損傷');
+        const nextCat = categories[(currentIdx + 1) % categories.length];
         return { ...btn, category: nextCat };
       }
       return btn;
@@ -481,7 +483,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{btnName}</span>
                         <span
-                          className={`category-badge ${btnConfig.category === '場所' ? 'category-location' : 'category-damage'
+                          className={`category-badge ${btnConfig.category === '場所'
+                              ? 'category-location'
+                              : btnConfig.category === '階数'
+                                ? 'category-floor'
+                                : btnConfig.category === '箇所'
+                                  ? 'category-part'
+                                  : 'category-damage'
                             }`}
                         >
                           {btnConfig.category}
@@ -515,6 +523,52 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 })}
               </div>
             )}
+          </section>
+
+          {/* 内部用 方向グループ（東西南北） */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Compass size={18} />
+                方向グループ
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
+                ※最大2つ選択可
+              </span>
+            </div>
+
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+              {DIRECTION_OPTIONS.map((dir) => {
+                const isSelected = selection.directions.includes(dir);
+                return (
+                  <button
+                    key={dir}
+                    type="button"
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleDirectionToggle(dir)}
+                    style={{ height: '48px', fontSize: '1.05rem' }}
+                  >
+                    {dir}
+                  </button>
+                );
+              })}
+            </div>
           </section>
 
           {/* ② 選択された「損傷」タイプの詳細入力（W / L 数値 & 全般/多数 プリセット） */}
@@ -813,7 +867,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>登録種別:</span>
-                {(['損傷', '場所'] as CustomButtonCategory[]).map((cat) => (
+                {(['損傷', '場所', '階数', '箇所'] as CustomButtonCategory[]).map((cat) => (
                   <label key={cat} style={{ fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
                     <input
                       type="radio"
@@ -866,7 +920,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       <button
                         type="button"
                         onClick={() => handleToggleCategory(btnConfig.id)}
-                        className={`category-badge ${btnConfig.category === '場所' ? 'category-location' : 'category-damage'
+                        className={`category-badge ${btnConfig.category === '場所'
+                            ? 'category-location'
+                            : btnConfig.category === '階数'
+                              ? 'category-floor'
+                              : btnConfig.category === '箇所'
+                                ? 'category-part'
+                                : 'category-damage'
                           }`}
                         style={{ cursor: 'pointer', border: 'none' }}
                         title="クリックして種類切り替え"

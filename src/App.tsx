@@ -343,6 +343,7 @@ export const App: React.FC = () => {
         onInsertLine={handleInsertLineAfterCurrent}
         canPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
         canCopyPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
+        customButtons={customButtons}
       />
 
       {/* メイン操作エリア */}
@@ -361,6 +362,7 @@ export const App: React.FC = () => {
             lines={activeTab.lines}
             currentLineIndex={activeTab.currentLineIndex}
             onNavigateToLine={handleNavigateToLine}
+            customButtons={customButtons}
           />
         </>
       )}
@@ -411,6 +413,7 @@ export const App: React.FC = () => {
           houseNumber={activeTab.basicInfo.houseNumber}
           currentLineIndex={activeTab.currentLineIndex}
           onNavigateToLine={handleNavigateToLine}
+          customButtons={customButtons}
         />
       )}
     </>

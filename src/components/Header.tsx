@@ -1,5 +1,5 @@
 import React from 'react';
-import { TabData } from '../types';
+import { TabData, CustomButtonConfig } from '../types';
 import { getTabName } from '../utils/tabUtils';
 import { generateLineText } from '../utils/textGenerator';
 import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy } from 'lucide-react';
@@ -18,6 +18,7 @@ interface HeaderProps {
   onInsertLine: () => void;
   canPrev: boolean;
   canCopyPrev: boolean;
+  customButtons?: CustomButtonConfig[];
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,11 +35,12 @@ export const Header: React.FC<HeaderProps> = ({
   onInsertLine,
   canPrev,
   canCopyPrev,
+  customButtons = [],
 }) => {
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
   const currentLine = activeTab?.lines[activeTab.currentLineIndex];
-  const currentLineText = currentLine ? generateLineText(currentLine.selection) : '';
+  const currentLineText = currentLine ? generateLineText(currentLine.selection, customButtons) : '';
 
   const totalLines = activeTab?.lines.length || 1;
   const currentLineNum = (activeTab?.currentLineIndex || 0) + 1;

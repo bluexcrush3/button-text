@@ -1,10 +1,10 @@
-import { LineSelection } from '../types';
+import { LineSelection, CustomButtonConfig } from '../types';
 
 /**
  * 方向グループの2要素を結合表記に変換
  */
 export function formatDirections(dirs: string[]): string {
-  if (dirs.length === 0) return '';
+  if (!dirs || dirs.length === 0) return '';
   if (dirs.length === 1) return dirs[0];
 
   const set = new Set(dirs);
@@ -20,30 +20,6 @@ export function formatDirections(dirs: string[]): string {
 }
 
 /**
- * 場所グループの文字列をフォーマット
- */
-export function formatLocation(selection: LineSelection): string {
-  // 「塀」または「土間」が選択されている場合は「場所」グループを出力しない
-  if (selection.part === '塀' || selection.part === '土間') {
-    return '';
-  }
-
-  const { isBuilding, floor1, floor2 } = selection.location;
-  let buildingText = isBuilding ? '建物' : '';
-  let floorText = '';
-
-  if (floor1 > 0 && floor2 > 0) {
-    floorText = `${floor1}-${floor2}階`;
-  } else if (floor1 > 0) {
-    floorText = `${floor1}階`;
-  } else if (floor2 > 0) {
-    floorText = `${floor2}階`;
-  }
-
-  return `${buildingText}${floorText}`;
-}
-
-/**
  * 数値をフォーマット (1 -> 1.0, 1.5 -> 1.5)
  */
 export function formatDamageValue(val: number): string {
@@ -54,93 +30,199 @@ export function formatDamageValue(val: number): string {
   return `${val}`;
 }
 
-export function generateLineText(selection: LineSelection): string {
-  // 調査モードが「内部」の場合
-  if (selection.mode === '内部') {
-    const parts: string[] = [];
-    if (selection.internalSelections && selection.internalSelections.length > 0) {
-      const formattedItems = selection.internalSelections.map((btnName) => {
-        const dmgInfo = (selection.internalDamages || []).find((d) => d.name === btnName);
-        if (!dmgInfo) return btnName;
+export interface LineComponents {
+  location: string;
+  floor: string;
+  direction: string;
+  part: string;
+  damages: string[];
+  situation: string;
+}
 
-        if (dmgInfo.preset) {
-          return `${btnName}${dmgInfo.preset}`;
-        }
-        const wVal = dmgInfo.valueW ?? 0;
-        const lVal = dmgInfo.valueL ?? 0;
-        let valStr = '';
-        if (wVal > 0 && lVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-        } else if (wVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}`;
-        } else if (lVal > 0) {
-          valStr = `L${formatDamageValue(lVal)}`;
-        }
-        return `${btnName}${valStr}`;
-      });
-      parts.push(...formattedItems);
-    }
-    if (selection.situationButton) {
-      parts.push(selection.situationButton);
-    }
-    if (selection.situationText && selection.situationText.trim()) {
-      parts.push(selection.situationText.trim());
-    }
-    return parts.join('/');
-  }
+export function getLineComponents(
+  selection: LineSelection,
+  customButtons: CustomButtonConfig[] = []
+): LineComponents {
+  const isInternal = selection.mode === '内部';
 
-  const parts: string[] = [];
+  const direction = formatDirections(selection.directions || []);
 
-  // ① 場所グループ
-  const locationText = formatLocation(selection);
-  if (locationText) {
-    parts.push(locationText);
-  }
-
-  // ② 方向グループ
-  const directionText = formatDirections(selection.directions);
-  if (directionText) {
-    parts.push(directionText);
-  }
-
-  // ③ 箇所グループ
-  if (selection.part) {
-    parts.push(selection.part);
-  }
-
-  // ④ 損傷グループ (最大2つ、各数値(W/L)または「全般」「多数」付き)
-  if (selection.damages && selection.damages.length > 0) {
-    const damageText = selection.damages
-      .map((d) => {
-        if (d.preset) {
-          return `${d.name}${d.preset}`;
-        }
-        const wVal = d.valueW ?? d.value ?? 0;
-        const lVal = d.valueL ?? 0;
-        let valStr = '';
-        if (wVal > 0 && lVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-        } else if (wVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}`;
-        } else if (lVal > 0) {
-          valStr = `L${formatDamageValue(lVal)}`;
-        }
-        return `${d.name}${valStr}`;
-      })
-      .join('');
-    if (damageText) {
-      parts.push(damageText);
-    }
-  }
-
-  // ⑤ 状況グループ (末尾に追加)
-  if (selection.situationButton) {
-    parts.push(selection.situationButton);
-  }
+  const situationParts: string[] = [];
+  if (selection.situationButton) situationParts.push(selection.situationButton);
   if (selection.situationText && selection.situationText.trim()) {
-    parts.push(selection.situationText.trim());
+    situationParts.push(selection.situationText.trim());
+  }
+  const situation = situationParts.join(' ');
+
+  if (isInternal) {
+    const selectedBtnNames = selection.internalSelections || [];
+    const locationNames: string[] = [];
+    const floorNames: string[] = [];
+    const partNames: string[] = [];
+    const damageStrings: string[] = [];
+
+    selectedBtnNames.forEach((btnName) => {
+      const btnConfig = customButtons.find((b) => b.name === btnName);
+      const cat = btnConfig?.category || '損傷';
+
+      if (cat === '場所') {
+        locationNames.push(btnName);
+      } else if (cat === '階数') {
+        floorNames.push(btnName);
+      } else if (cat === '箇所') {
+        partNames.push(btnName);
+      } else if (cat === '損傷') {
+        const dmgInfo = (selection.internalDamages || []).find((d) => d.name === btnName);
+        if (!dmgInfo) {
+          damageStrings.push(btnName);
+        } else if (dmgInfo.preset) {
+          damageStrings.push(`${btnName}${dmgInfo.preset}`);
+        } else {
+          const wVal = dmgInfo.valueW ?? 0;
+          const lVal = dmgInfo.valueL ?? 0;
+          let valStr = '';
+          if (wVal > 0 && lVal > 0) {
+            valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+          } else if (wVal > 0) {
+            valStr = `W${formatDamageValue(wVal)}`;
+          } else if (lVal > 0) {
+            valStr = `L${formatDamageValue(lVal)}`;
+          }
+          damageStrings.push(`${btnName}${valStr}`);
+        }
+      }
+    });
+
+    let location = locationNames.join('');
+    let floor = floorNames.join('');
+
+    // モード内未指定で既存の建物/階数情報があれば補完
+    if (!location && !floor && (selection.part !== '塀' && selection.part !== '土間')) {
+      if (selection.location?.isBuilding && locationNames.length === 0) {
+        // 必要に応じて
+      }
+      const { floor1, floor2 } = selection.location || {};
+      if (floor1 > 0 && floor2 > 0) floor = `${floor1}-${floor2}階`;
+      else if (floor1 > 0) floor = `${floor1}階`;
+      else if (floor2 > 0) floor = `${floor2}階`;
+    }
+
+    return {
+      location,
+      floor,
+      direction,
+      part: partNames.join(''),
+      damages: damageStrings,
+      situation,
+    };
+  } else {
+    // 外部モード
+    let location = '';
+    let floor = '';
+
+    if (selection.part !== '塀' && selection.part !== '土間') {
+      if (selection.location?.isBuilding) {
+        location = '建物';
+      }
+      const { floor1, floor2 } = selection.location || {};
+      if (floor1 > 0 && floor2 > 0) floor = `${floor1}-${floor2}階`;
+      else if (floor1 > 0) floor = `${floor1}階`;
+      else if (floor2 > 0) floor = `${floor2}階`;
+    }
+
+    const part = selection.part || '';
+
+    const damageStrings: string[] = [];
+    if (selection.damages && selection.damages.length > 0) {
+      selection.damages.forEach((d) => {
+        if (d.preset) {
+          damageStrings.push(`${d.name}${d.preset}`);
+        } else {
+          const wVal = d.valueW ?? d.value ?? 0;
+          const lVal = d.valueL ?? 0;
+          let valStr = '';
+          if (wVal > 0 && lVal > 0) {
+            valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+          } else if (wVal > 0) {
+            valStr = `W${formatDamageValue(wVal)}`;
+          } else if (lVal > 0) {
+            valStr = `L${formatDamageValue(lVal)}`;
+          }
+          damageStrings.push(`${d.name}${valStr}`);
+        }
+      });
+    }
+
+    return {
+      location,
+      floor,
+      direction,
+      part,
+      damages: damageStrings,
+      situation,
+    };
+  }
+}
+
+/**
+ * クリップボード（スプレッドシート貼付）用フォーマット
+ * Col 1: 【場所】+半角空白+【階数】
+ * Col 2: 【方位】
+ * Col 3: 【箇所】+半角空白+【損傷①】+・【損傷②】(損傷②があった場合のみ)
+ */
+export function generateLineTextForSpreadsheet(
+  selection: LineSelection,
+  customButtons: CustomButtonConfig[] = []
+): string {
+  const comp = getLineComponents(selection, customButtons);
+
+  // Col 1: 【場所】 +半角空白+ 【階数】
+  const col1 = [comp.location, comp.floor].filter(Boolean).join(' ');
+
+  // Col 2: 【方位】
+  const col2 = comp.direction;
+
+  // Col 3: 【箇所】 +半角空白+ 【損傷①】・【損傷②】
+  const damageCombined = comp.damages.join('・');
+  let damageAndSit = damageCombined;
+  if (comp.situation) {
+    if (damageAndSit) {
+      damageAndSit += `/${comp.situation}`;
+    } else {
+      damageAndSit = comp.situation;
+    }
   }
 
-  // グループ間をスラッシュ '/' で結合
-  return parts.join('/');
+  const col3 = [comp.part, damageAndSit].filter(Boolean).join(' ');
+
+  return `${col1}\t${col2}\t${col3}`;
+}
+
+export function generateLineText(
+  selection: LineSelection,
+  customButtons: CustomButtonConfig[] = [],
+  delimiter: string = '/'
+): string {
+  if (delimiter === '\t') {
+    return generateLineTextForSpreadsheet(selection, customButtons);
+  }
+
+  const comp = getLineComponents(selection, customButtons);
+
+  const col1 = [comp.location, comp.floor].filter(Boolean).join(' ');
+  const col2 = comp.direction;
+
+  const damageCombined = comp.damages.join('・');
+  let damageAndSit = damageCombined;
+  if (comp.situation) {
+    if (damageAndSit) {
+      damageAndSit += `/${comp.situation}`;
+    } else {
+      damageAndSit = comp.situation;
+    }
+  }
+
+  const col3 = [comp.part, damageAndSit].filter(Boolean).join(' ');
+
+  return [col1, col2, col3].filter(Boolean).join(' / ');
 }

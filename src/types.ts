@@ -27,7 +27,7 @@ export interface DamageItem {
   value?: number; // 互換性用
 }
 
-export type CustomButtonCategory = '場所' | '損傷';
+export type CustomButtonCategory = '場所' | '階数' | '箇所' | '損傷';
 
 export interface CustomButtonConfig {
   id: string;

@@ -1,27 +1,33 @@
 import React, { useState } from 'react';
-import { LineData } from '../types';
-import { generateLineText } from '../utils/textGenerator';
+import { LineData, CustomButtonConfig } from '../types';
+import { generateLineText, generateLineTextForSpreadsheet } from '../utils/textGenerator';
 import { FileText, Copy, Check } from 'lucide-react';
 
 interface AllTextPreviewPanelProps {
     lines: LineData[];
     currentLineIndex: number;
     onNavigateToLine: (index: number) => void;
+    customButtons?: CustomButtonConfig[];
 }
 
 export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
     lines,
     currentLineIndex,
     onNavigateToLine,
+    customButtons = [],
 }) => {
     const [copied, setCopied] = useState(false);
 
-    const lineTexts = lines.map((line) => generateLineText(line.selection));
+    const lineTexts = lines.map((line) => generateLineText(line.selection, customButtons));
     const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(fullText);
+            const copyText = lines
+                .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons))
+                .filter((t) => t.trim().length > 0)
+                .join('\n');
+            await navigator.clipboard.writeText(copyText);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {

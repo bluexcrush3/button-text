@@ -508,6 +508,18 @@ button.btn-danger:active {
   border: 1px solid #74c0fc;
 }
 
+.category-badge.category-floor {
+  background-color: #ebfbee;
+  color: #2b8a3e;
+  border: 1px solid #8ce99a;
+}
+
+.category-badge.category-part {
+  background-color: #fff4e6;
+  color: #d9480f;
+  border: 1px solid #ffd8a8;
+}
+
 .category-badge.category-damage {
   background-color: #fff0f6;
   color: #d6336c;

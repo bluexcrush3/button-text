@@ -30,6 +30,30 @@ export function formatDamageValue(val: number): string {
   return `${val}`;
 }
 
+/**
+ * 階数のテキストフォーマット
+ * ・隣り合わせの数字の場合: 1・2階
+ * ・隣り合わせの数字でない場合: 1～3階
+ * ・単一数字の場合: 1階
+ */
+export function formatFloor(floor1: number, floor2: number): string {
+  if (floor1 > 0 && floor2 > 0) {
+    if (floor1 === floor2) return `${floor1}階`;
+    const min = Math.min(floor1, floor2);
+    const max = Math.max(floor1, floor2);
+    if (max - min === 1) {
+      return `${min}・${max}階`;
+    } else {
+      return `${min}～${max}階`;
+    }
+  } else if (floor1 > 0) {
+    return `${floor1}階`;
+  } else if (floor2 > 0) {
+    return `${floor2}階`;
+  }
+  return '';
+}
+
 export interface LineComponents {
   location: string;
   floor: string;
@@ -41,8 +65,15 @@ export interface LineComponents {
 
 export function getLineComponents(
   selection: LineSelection,
-  customButtons: CustomButtonConfig[] = []
+  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = []
 ): LineComponents {
+  let customButtons: CustomButtonConfig[] = [];
+  if (Array.isArray(customButtonsInput)) {
+    customButtons = customButtonsInput;
+  } else if (customButtonsInput && typeof customButtonsInput === 'object') {
+    customButtons = selection.mode === '内部' ? (customButtonsInput.internal || []) : (customButtonsInput.external || []);
+  }
+
   const isInternal = selection.mode === '内部';
 
   const direction = formatDirections(selection.directions || []);
@@ -54,65 +85,66 @@ export function getLineComponents(
   }
   const situation = situationParts.join(' ');
 
-  if (isInternal) {
-    const selectedBtnNames = selection.internalSelections || [];
-    const locationNames: string[] = [];
-    const floorNames: string[] = [];
-    const partNames: string[] = [];
-    const damageStrings: string[] = [];
+  const selectedBtnNames = isInternal
+    ? (selection.internalSelections || [])
+    : (selection.externalSelections || []);
 
-    selectedBtnNames.forEach((btnName) => {
-      const btnConfig = customButtons.find((b) => b.name === btnName);
-      const cat = btnConfig?.category || '損傷';
+  const selectedDamages = isInternal
+    ? (selection.internalDamages || [])
+    : (selection.externalDamages || []);
 
-      if (cat === '場所') {
-        locationNames.push(btnName);
-      } else if (cat === '階数') {
-        floorNames.push(btnName);
-      } else if (cat === '箇所') {
-        partNames.push(btnName);
-      } else if (cat === '損傷') {
-        const dmgInfo = (selection.internalDamages || []).find((d) => d.name === btnName);
-        if (!dmgInfo) {
-          damageStrings.push(btnName);
-        } else if (dmgInfo.preset) {
-          damageStrings.push(`${btnName}${dmgInfo.preset}`);
-        } else {
-          const wVal = dmgInfo.valueW ?? 0;
-          const lVal = dmgInfo.valueL ?? 0;
-          let valStr = '';
-          if (wVal > 0 && lVal > 0) {
-            valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-          } else if (wVal > 0) {
-            valStr = `W${formatDamageValue(wVal)}`;
-          } else if (lVal > 0) {
-            valStr = `L${formatDamageValue(lVal)}`;
-          }
-          damageStrings.push(`${btnName}${valStr}`);
+  const locationNames: string[] = [];
+  const floorNames: string[] = [];
+  const partNames: string[] = [];
+  const customDamageStrings: string[] = [];
+
+  selectedBtnNames.forEach((btnName) => {
+    const baseName = btnName.replace(/[①-⑳]/g, '');
+    const btnConfig = customButtons.find((b) => b.name === btnName || b.name === baseName);
+    const cat = btnConfig?.category || '損傷';
+
+    if (cat === '場所') {
+      locationNames.push(btnName);
+    } else if (cat === '階数') {
+      floorNames.push(btnName);
+    } else if (cat === '部位') {
+      partNames.push(btnName);
+    } else if (cat === '損傷') {
+      const dmgInfo = selectedDamages.find((d) => d.name === btnName);
+      if (!dmgInfo) {
+        customDamageStrings.push(btnName);
+      } else if (dmgInfo.preset) {
+        customDamageStrings.push(`${btnName}${dmgInfo.preset}`);
+      } else {
+        const wVal = dmgInfo.valueW ?? 0;
+        const lVal = dmgInfo.valueL ?? 0;
+        let valStr = '';
+        if (wVal > 0 && lVal > 0) {
+          valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+        } else if (wVal > 0) {
+          valStr = `W${formatDamageValue(wVal)}`;
+        } else if (lVal > 0) {
+          valStr = `L${formatDamageValue(lVal)}`;
         }
+        customDamageStrings.push(`${btnName}${valStr}`);
       }
-    });
-
-    let location = locationNames.join('');
-    let floor = floorNames.join('');
-
-    // モード内未指定で既存の建物/階数情報があれば補完
-    if (!location && !floor && (selection.part !== '塀' && selection.part !== '土間')) {
-      if (selection.location?.isBuilding && locationNames.length === 0) {
-        // 必要に応じて
-      }
-      const { floor1, floor2 } = selection.location || {};
-      if (floor1 > 0 && floor2 > 0) floor = `${floor1}-${floor2}階`;
-      else if (floor1 > 0) floor = `${floor1}階`;
-      else if (floor2 > 0) floor = `${floor2}階`;
     }
+  });
+
+  if (isInternal) {
+    const buildingStr = selection.location?.isBuilding ? '建物' : '';
+    const location = [buildingStr, ...locationNames].filter(Boolean).join('');
+
+    const { floor1, floor2 } = selection.location || {};
+    const stepperFloor = formatFloor(floor1, floor2);
+    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
 
     return {
       location,
       floor,
       direction,
       part: partNames.join(''),
-      damages: damageStrings,
+      damages: customDamageStrings,
       situation,
     };
   } else {
@@ -121,22 +153,21 @@ export function getLineComponents(
     let floor = '';
 
     if (selection.part !== '塀' && selection.part !== '土間') {
-      if (selection.location?.isBuilding) {
-        location = '建物';
-      }
+      const buildingStr = selection.location?.isBuilding ? '建物' : '';
+      location = [buildingStr, ...locationNames].filter(Boolean).join('');
+
       const { floor1, floor2 } = selection.location || {};
-      if (floor1 > 0 && floor2 > 0) floor = `${floor1}-${floor2}階`;
-      else if (floor1 > 0) floor = `${floor1}階`;
-      else if (floor2 > 0) floor = `${floor2}階`;
+      const stepperFloor = formatFloor(floor1, floor2);
+      floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
     }
 
-    const part = selection.part || '';
+    const part = [selection.part, ...partNames].filter(Boolean).join('');
 
-    const damageStrings: string[] = [];
+    const standardDamageStrings: string[] = [];
     if (selection.damages && selection.damages.length > 0) {
       selection.damages.forEach((d) => {
         if (d.preset) {
-          damageStrings.push(`${d.name}${d.preset}`);
+          standardDamageStrings.push(`${d.name}${d.preset}`);
         } else {
           const wVal = d.valueW ?? d.value ?? 0;
           const lVal = d.valueL ?? 0;
@@ -148,17 +179,19 @@ export function getLineComponents(
           } else if (lVal > 0) {
             valStr = `L${formatDamageValue(lVal)}`;
           }
-          damageStrings.push(`${d.name}${valStr}`);
+          standardDamageStrings.push(`${d.name}${valStr}`);
         }
       });
     }
+
+    const allDamages = [...standardDamageStrings, ...customDamageStrings];
 
     return {
       location,
       floor,
       direction,
       part,
-      damages: damageStrings,
+      damages: allDamages,
       situation,
     };
   }
@@ -168,13 +201,13 @@ export function getLineComponents(
  * クリップボード（スプレッドシート貼付）用フォーマット
  * Col 1: 【場所】+半角空白+【階数】
  * Col 2: 【方位】
- * Col 3: 【箇所】+半角空白+【損傷①】+・【損傷②】(損傷②があった場合のみ)
+ * Col 3: 【部位】+半角空白+【損傷①】+・【損傷②】(損傷②があった場合のみ)
  */
 export function generateLineTextForSpreadsheet(
   selection: LineSelection,
-  customButtons: CustomButtonConfig[] = []
+  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = []
 ): string {
-  const comp = getLineComponents(selection, customButtons);
+  const comp = getLineComponents(selection, customButtonsInput);
 
   // Col 1: 【場所】 +半角空白+ 【階数】
   const col1 = [comp.location, comp.floor].filter(Boolean).join(' ');
@@ -182,7 +215,7 @@ export function generateLineTextForSpreadsheet(
   // Col 2: 【方位】
   const col2 = comp.direction;
 
-  // Col 3: 【箇所】 +半角空白+ 【損傷①】・【損傷②】
+  // Col 3: 【部位】 +半角空白+ 【損傷①】・【損傷②】
   const damageCombined = comp.damages.join('・');
   let damageAndSit = damageCombined;
   if (comp.situation) {
@@ -200,14 +233,14 @@ export function generateLineTextForSpreadsheet(
 
 export function generateLineText(
   selection: LineSelection,
-  customButtons: CustomButtonConfig[] = [],
+  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = [],
   delimiter: string = '/'
 ): string {
   if (delimiter === '\t') {
-    return generateLineTextForSpreadsheet(selection, customButtons);
+    return generateLineTextForSpreadsheet(selection, customButtonsInput);
   }
 
-  const comp = getLineComponents(selection, customButtons);
+  const comp = getLineComponents(selection, customButtonsInput);
 
   const col1 = [comp.location, comp.floor].filter(Boolean).join(' ');
   const col2 = comp.direction;

@@ -10,7 +10,7 @@ interface AllTextModalProps {
   houseNumber: number;
   currentLineIndex?: number;
   onNavigateToLine?: (index: number) => void;
-  customButtons?: CustomButtonConfig[];
+  customButtons?: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] };
 }
 
 export const AllTextModal: React.FC<AllTextModalProps> = ({

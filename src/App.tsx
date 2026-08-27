@@ -10,8 +10,10 @@ import { AllTextPreviewPanel } from './components/AllTextPreviewPanel';
 const STORAGE_KEY_TABS = 'btn_text_gen_tabs_v4';
 const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
 const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
+const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v6';
+const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v1';
 
-const DEFAULT_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
   { id: 'btn-1', name: '床きしみ', category: '損傷' },
   { id: 'btn-2', name: '建具すれ', category: '損傷' },
   { id: 'btn-3', name: 'クロス隙間', category: '損傷' },
@@ -24,20 +26,30 @@ const DEFAULT_CUSTOM_BUTTONS: CustomButtonConfig[] = [
   { id: 'btn-10', name: '洋室', category: '場所' },
 ];
 
+const DEFAULT_EXTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+  { id: 'ext-btn-1', name: 'ひび割れ', category: '損傷' },
+  { id: 'ext-btn-2', name: '水切り隙間', category: '損傷' },
+  { id: 'ext-btn-3', name: '樋歪み', category: '損傷' },
+  { id: 'ext-btn-4', name: 'コケ付着', category: '損傷' },
+  { id: 'ext-btn-5', name: '塗膜剥離', category: '損傷' },
+];
+
 const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelection => ({
   mode: defaultMode,
   location: {
-    isBuilding: true, // 建物ボタンはデフォルトで選択状態
-    floor1: 1,        // デフォルトで 1
+    isBuilding: false, // デフォルト未選択
+    floor1: 0,        // デフォルト未選択 (0)
     floor2: 0,
   },
   directions: [],
   part: null,
   damages: [],
-  situationButton: '現況', // デフォルトで 現況
+  situationButton: null, // デフォルト未選択
   situationText: '',
   internalSelections: [],
   internalDamages: [],
+  externalSelections: [],
+  externalDamages: [],
 });
 
 const createInitialLine = (defaultMode: SurveyType = '外部'): LineData => ({
@@ -85,13 +97,12 @@ export const App: React.FC = () => {
     return 'tab-1';
   });
 
-  const [customButtons, setCustomButtons] = useState<CustomButtonConfig[]>(() => {
+  const [internalCustomButtons, setInternalCustomButtons] = useState<CustomButtonConfig[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_CUSTOM_BUTTONS);
+      const saved = localStorage.getItem(STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS) || localStorage.getItem(STORAGE_KEY_CUSTOM_BUTTONS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // 文字列配列だった場合の自動移行
           if (typeof parsed[0] === 'string') {
             return parsed.map((name: string, i: number) => ({
               id: `btn-${Date.now()}-${i}`,
@@ -103,18 +114,48 @@ export const App: React.FC = () => {
         }
       }
     } catch (e) {
-      console.error('Failed to load custom buttons', e);
+      console.error('Failed to load internal custom buttons', e);
     }
-    return DEFAULT_CUSTOM_BUTTONS;
+    return DEFAULT_INTERNAL_CUSTOM_BUTTONS;
+  });
+
+  const [externalCustomButtons, setExternalCustomButtons] = useState<CustomButtonConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (typeof parsed[0] === 'string') {
+            return parsed.map((name: string, i: number) => ({
+              id: `ext-btn-${Date.now()}-${i}`,
+              name,
+              category: '損傷',
+            }));
+          }
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load external custom buttons', e);
+    }
+    return DEFAULT_EXTERNAL_CUSTOM_BUTTONS;
   });
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_CUSTOM_BUTTONS, JSON.stringify(customButtons));
+      localStorage.setItem(STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS, JSON.stringify(internalCustomButtons));
     } catch (e) {
-      console.error('Failed to save custom buttons', e);
+      console.error('Failed to save internal custom buttons', e);
     }
-  }, [customButtons]);
+  }, [internalCustomButtons]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS, JSON.stringify(externalCustomButtons));
+    } catch (e) {
+      console.error('Failed to save external custom buttons', e);
+    }
+  }, [externalCustomButtons]);
 
   // モーダル表示状態
   const [isBasicInfoOpen, setIsBasicInfoOpen] = useState(false);
@@ -255,6 +296,35 @@ export const App: React.FC = () => {
     );
   };
 
+  // 現在の行（ページ）を削除
+  const handleDeleteCurrentLine = () => {
+    if (!activeTab) return;
+
+    setTabs((prev) =>
+      prev.map((t) => {
+        if (t.id !== activeTabId) return t;
+
+        if (t.lines.length > 1) {
+          const updatedLines = t.lines.filter((_, idx) => idx !== t.currentLineIndex);
+          const nextIndex = Math.min(t.currentLineIndex, updatedLines.length - 1);
+          return {
+            ...t,
+            lines: updatedLines,
+            currentLineIndex: Math.max(0, nextIndex),
+          };
+        } else {
+          // 1行しかない場合は入力選択をクリア
+          const updatedLines = [createInitialLine(t.basicInfo.surveyType)];
+          return {
+            ...t,
+            lines: updatedLines,
+            currentLineIndex: 0,
+          };
+        }
+      })
+    );
+  };
+
   // 指定の行へ移動
   const handleNavigateToLine = (index: number) => {
     if (!activeTab) return;
@@ -341,9 +411,10 @@ export const App: React.FC = () => {
         onOpenAllText={() => setIsAllTextOpen(true)}
         onCopyPrevLine={handleCopyPrevLine}
         onInsertLine={handleInsertLineAfterCurrent}
+        onDeleteLine={handleDeleteCurrentLine}
         canPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
         canCopyPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
-        customButtons={customButtons}
+        customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
       />
 
       {/* メイン操作エリア */}
@@ -354,15 +425,17 @@ export const App: React.FC = () => {
             selection={currentSelection}
             onChangeSelection={handleChangeSelection}
             onClearCurrentLine={handleClearCurrentLine}
-            customButtons={customButtons}
-            onChangeCustomButtons={setCustomButtons}
+            internalCustomButtons={internalCustomButtons}
+            externalCustomButtons={externalCustomButtons}
+            onChangeInternalCustomButtons={setInternalCustomButtons}
+            onChangeExternalCustomButtons={setExternalCustomButtons}
           />
           {/* TOP画面最下部: 全行プレビューエリア */}
           <AllTextPreviewPanel
             lines={activeTab.lines}
             currentLineIndex={activeTab.currentLineIndex}
             onNavigateToLine={handleNavigateToLine}
-            customButtons={customButtons}
+            customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
           />
         </>
       )}
@@ -413,7 +486,7 @@ export const App: React.FC = () => {
           houseNumber={activeTab.basicInfo.houseNumber}
           currentLineIndex={activeTab.currentLineIndex}
           onNavigateToLine={handleNavigateToLine}
-          customButtons={customButtons}
+          customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
         />
       )}
     </>

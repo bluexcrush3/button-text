@@ -2,7 +2,7 @@ import React from 'react';
 import { TabData, CustomButtonConfig } from '../types';
 import { getTabName } from '../utils/tabUtils';
 import { generateLineText } from '../utils/textGenerator';
-import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy } from 'lucide-react';
+import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy, X } from 'lucide-react';
 
 interface HeaderProps {
   tabs: TabData[];
@@ -16,9 +16,10 @@ interface HeaderProps {
   onOpenAllText: () => void;
   onCopyPrevLine: () => void;
   onInsertLine: () => void;
+  onDeleteLine: () => void;
   canPrev: boolean;
   canCopyPrev: boolean;
-  customButtons?: CustomButtonConfig[];
+  customButtons?: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] };
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAllText,
   onCopyPrevLine,
   onInsertLine,
+  onDeleteLine,
   canPrev,
   canCopyPrev,
   customButtons = [],
@@ -134,21 +136,12 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* 3行目: 基本情報サマリー ＆ 「＋」挿入ボタン & 「前回と同じ」ボタン */}
+      {/* 3行目: 基本情報サマリー ＆ 「＋」「×」「前回と同じ」ボタン */}
       {activeTab && (
         <div className="header-row-3">
           <div className="status-badges-group">
-            <div className="status-badge">
-              家屋: <strong>#{activeTab.basicInfo.houseNumber}</strong>
-            </div>
-            <div className="status-badge">
-              種別: <strong>{activeTab.basicInfo.surveyType}</strong>
-            </div>
-            <div className="status-badge">
-              担当: <strong>{activeTab.basicInfo.investigator}</strong>
-            </div>
-            <div className="status-badge">
-              フォルダ: <strong>#{activeTab.basicInfo.folderNumber}</strong>
+            <div className="status-badge" style={{ fontWeight: 'bold' }}>
+              #{activeTab.basicInfo.houseNumber} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
             </div>
           </div>
 
@@ -162,6 +155,17 @@ export const Header: React.FC<HeaderProps> = ({
               style={{ backgroundColor: '#eef6ff', borderColor: '#0d6efd', padding: '4px 8px' }}
             >
               <Plus size={16} />
+            </button>
+
+            {/* 「×」現在の行削除ボタン */}
+            <button
+              type="button"
+              className="btn-copy-prev"
+              onClick={onDeleteLine}
+              title="現在の行（ページ）を削除"
+              style={{ backgroundColor: '#fff5f5', borderColor: '#dc3545', color: '#dc3545', padding: '4px 8px' }}
+            >
+              <X size={16} />
             </button>
 
             {/* 「前回と同じ」ボタン */}

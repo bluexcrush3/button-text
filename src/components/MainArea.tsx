@@ -575,8 +575,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const DIRECTION_OPTIONS = ['北', '西', '南', '東'];
-  const PART_OPTIONS = ['壁', '腰', '軒', '塀', '土間'];
-  const DAMAGE_OPTIONS = ['亀裂', '隙間', 'HC', '欠落', '目地切れ', '剥離'];
+  const PART_OPTIONS = ['壁', '腰', '軒', '屋根', '塀', '土間'];
+  const DAMAGE_OPTIONS = ['亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ'];
 
   return (
     <main className="main-content">
@@ -1665,7 +1665,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
               {PART_OPTIONS.map((part) => {
                 const isSelected = selection.part === part;
                 return (
@@ -1712,7 +1712,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {DAMAGE_OPTIONS.map((dmg) => {
                 const isSelected = (selection.damages || []).some(
                   (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg

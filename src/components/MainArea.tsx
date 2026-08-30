@@ -204,6 +204,22 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
+  // 損傷の50設定
+  const handleDamage50Set = (index: number) => {
+    const current = [...(selection.damages || [])];
+    if (!current[index]) return;
+
+    const curW = current[index].valueW || 0;
+    const nextW = curW === 50 ? 0 : 50;
+    current[index] = { ...current[index], valueW: nextW, preset: null };
+
+    onChangeSelection({
+      ...selection,
+      damages: current,
+      situationButton: null,
+    });
+  };
+
   // 損傷のプリセット(全般 / 多数)切り替え
   const handleDamagePresetToggle = (index: number, presetType: '全般' | '多数') => {
     const current = [...(selection.damages || [])];
@@ -390,6 +406,19 @@ export const MainArea: React.FC<MainAreaProps> = ({
       list.push(item);
     }
     item.valueL = Math.max(0, parseFloat(rawVal) || 0);
+    updateCustomDamages(list);
+  };
+
+  const handleCustomDamage50Set = (btnName: string) => {
+    const list = [...currentCustomDamages];
+    let item = list.find((d) => d.name === btnName);
+    if (!item) {
+      item = { name: btnName, valueW: 0, valueL: 0 };
+      list.push(item);
+    }
+    const curW = item.valueW || 0;
+    item.valueW = curW === 50 ? 0 : 50;
+    item.preset = null;
     updateCustomDamages(list);
   };
 
@@ -945,6 +974,19 @@ export const MainArea: React.FC<MainAreaProps> = ({
                           >
                             上下
                           </button>
+                          <button
+                            type="button"
+                            className={`btn ${item.valueW === 50 ? 'selected' : ''}`}
+                            onClick={() => handleCustomDamage50Set(btnName)}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '0.75rem',
+                              height: '26px',
+                              fontWeight: item.valueW === 50 ? 'bold' : 'normal',
+                            }}
+                          >
+                            50
+                          </button>
                           {(['全般', '多数'] as const).map((presetType) => {
                             const isPresetSelected = item.preset === presetType;
                             return (
@@ -977,18 +1019,18 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, -1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Minus size={12} />
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                -0.1
+                                -0.5
                               </button>
                               <input
                                 type="number"
@@ -997,21 +1039,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                                 className="stepper-input"
                                 value={item.valueW || ''}
                                 onChange={(e) => handleCustomDamageWInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', minWidth: '40px' }}
+                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                               />
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                +0.1
+                                +0.5
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, 1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Plus size={12} />
                               </button>
@@ -1027,18 +1069,18 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, -1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Minus size={12} />
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                -0.1
+                                -0.5
                               </button>
                               <input
                                 type="number"
@@ -1047,21 +1089,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                                 className="stepper-input"
                                 value={item.valueL || ''}
                                 onChange={(e) => handleCustomDamageLInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', minWidth: '40px' }}
+                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                               />
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                +0.1
+                                +0.5
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, 1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Plus size={12} />
                               </button>
@@ -1757,6 +1799,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         </button>
                         <button
                           type="button"
+                          className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
+                          onClick={() => handleDamage50Set(idx)}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
+                        >
+                          50
+                        </button>
+                        <button
+                          type="button"
                           className={`btn ${dmg.preset === '全般' ? 'selected' : ''}`}
                           onClick={() => handleDamagePresetToggle(idx, '全般')}
                           style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
@@ -1776,20 +1826,28 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
                     {/* 「全般」「多数」が未選択の場合のみ数値(W/L)入力ボックスを表示 */}
                     {!dmg.preset && (
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {/* 数値1W / 数値2W */}
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            数値{idx + 1}W
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                            数値{idx + 1}W:
                           </span>
-                          <div className="number-stepper" style={{ flex: 1, gap: '2px', minWidth: 0 }}>
+                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
                             <button
                               type="button"
-                              className="stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, -0.5)}
-                              style={{ width: '28px', height: '34px' }}
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, -1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
                             >
                               <Minus size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, -0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              -0.5
                             </button>
                             <input
                               type="number"
@@ -1798,13 +1856,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               value={dmg.valueW || ''}
                               placeholder="0"
                               onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
-                              style={{ height: '34px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
+                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                             />
                             <button
                               type="button"
-                              className="stepper-btn"
+                              className="btn stepper-btn"
                               onClick={() => handleDamageValueWChange(idx, 0.5)}
-                              style={{ width: '28px', height: '34px' }}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              +0.5
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, 1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
                             >
                               <Plus size={12} />
                             </button>
@@ -1812,18 +1878,26 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         </div>
 
                         {/* 数値1L / 数値2L */}
-                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                            数値{idx + 1}L
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                            数値{idx + 1}L:
                           </span>
-                          <div className="number-stepper" style={{ flex: 1, gap: '2px', minWidth: 0 }}>
+                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
                             <button
                               type="button"
-                              className="stepper-btn"
-                              onClick={() => handleDamageValueLChange(idx, -0.5)}
-                              style={{ width: '28px', height: '34px' }}
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, -1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
                             >
                               <Minus size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, -0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              -0.5
                             </button>
                             <input
                               type="number"
@@ -1832,13 +1906,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               value={dmg.valueL || ''}
                               placeholder="0"
                               onChange={(e) => handleDamageValueLInput(idx, e.target.value)}
-                              style={{ height: '34px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
+                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                             />
                             <button
                               type="button"
-                              className="stepper-btn"
+                              className="btn stepper-btn"
                               onClick={() => handleDamageValueLChange(idx, 0.5)}
-                              style={{ width: '28px', height: '34px' }}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              +0.5
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, 1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
                             >
                               <Plus size={12} />
                             </button>
@@ -1933,6 +2015,19 @@ export const MainArea: React.FC<MainAreaProps> = ({
                           >
                             上下
                           </button>
+                          <button
+                            type="button"
+                            className={`btn ${item.valueW === 50 ? 'selected' : ''}`}
+                            onClick={() => handleCustomDamage50Set(btnName)}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '0.75rem',
+                              height: '26px',
+                              fontWeight: item.valueW === 50 ? 'bold' : 'normal',
+                            }}
+                          >
+                            50
+                          </button>
                           {(['全般', '多数'] as const).map((presetType) => {
                             const isPresetSelected = item.preset === presetType;
                             return (
@@ -1965,18 +2060,18 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, -1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Minus size={12} />
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                -0.1
+                                -0.5
                               </button>
                               <input
                                 type="number"
@@ -1985,21 +2080,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                                 className="stepper-input"
                                 value={item.valueW || ''}
                                 onChange={(e) => handleCustomDamageWInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', minWidth: '40px' }}
+                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                               />
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                +0.1
+                                +0.5
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageWChange(btnName, 1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Plus size={12} />
                               </button>
@@ -2015,18 +2110,18 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, -1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Minus size={12} />
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                -0.1
+                                -0.5
                               </button>
                               <input
                                 type="number"
@@ -2035,21 +2130,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                                 className="stepper-input"
                                 value={item.valueL || ''}
                                 onChange={(e) => handleCustomDamageLInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', minWidth: '40px' }}
+                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                               />
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.1)}
-                                style={{ width: '32px', height: '32px', fontSize: '0.7rem', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
+                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
                               >
-                                +0.1
+                                +0.5
                               </button>
                               <button
                                 type="button"
                                 className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
-                                style={{ width: '28px', height: '32px', padding: 0 }}
+                                onClick={() => handleCustomDamageLChange(btnName, 1.0)}
+                                style={{ flex: 1, height: '32px', padding: 0 }}
                               >
                                 <Plus size={12} />
                               </button>
@@ -2293,99 +2388,101 @@ export const MainArea: React.FC<MainAreaProps> = ({
       )}
 
       {/* 「場所」カテゴリの番号選択ポップアップ modal (提案2) */}
-      {locationModalBtn && (() => {
-        const baseName = locationModalBtn.name;
-        const currentSelections = currentCustomSelections;
-        const currentSelectedFullName = currentSelections.find(
-          (item) => item === baseName || (item.startsWith(baseName) && /[①-⑳]$/.test(item))
-        );
+      {
+        locationModalBtn && (() => {
+          const baseName = locationModalBtn.name;
+          const currentSelections = currentCustomSelections;
+          const currentSelectedFullName = currentSelections.find(
+            (item) => item === baseName || (item.startsWith(baseName) && /[①-⑳]$/.test(item))
+          );
 
-        const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
+          const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
 
-        return (
-          <div className="modal-overlay" onClick={() => setLocationModalBtn(null)}>
-            <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px' }}>
-              <div className="modal-header" style={{ paddingBottom: '8px' }}>
-                <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <MapPin size={18} color="#0d6efd" />
-                  「{baseName}」の番号を選択
-                </h3>
-              </div>
+          return (
+            <div className="modal-overlay" onClick={() => setLocationModalBtn(null)}>
+              <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '360px' }}>
+                <div className="modal-header" style={{ paddingBottom: '8px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <MapPin size={18} color="#0d6efd" />
+                    「{baseName}」の番号を選択
+                  </h3>
+                </div>
 
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <p style={{ fontSize: '0.82rem', color: '#666', margin: 0 }}>
-                  付与する部屋番号（①〜⑨）を選択してください。
-                </p>
+                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <p style={{ fontSize: '0.82rem', color: '#666', margin: 0 }}>
+                    付与する部屋番号（①〜⑨）を選択してください。
+                  </p>
 
-                {/* 番号選択エリア */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* 番号なし（ベース名称） */}
-                  <button
-                    type="button"
-                    className={`btn ${currentSelectedFullName === baseName ? 'selected' : ''}`}
-                    onClick={() => handleSelectLocationNumber('')}
-                    style={{
-                      height: '40px',
-                      fontSize: '0.95rem',
-                      fontWeight: 'bold',
-                      width: '100%',
-                    }}
-                  >
-                    番号なし（{baseName}）
-                  </button>
+                  {/* 番号選択エリア */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* 番号なし（ベース名称） */}
+                    <button
+                      type="button"
+                      className={`btn ${currentSelectedFullName === baseName ? 'selected' : ''}`}
+                      onClick={() => handleSelectLocationNumber('')}
+                      style={{
+                        height: '40px',
+                        fontSize: '0.95rem',
+                        fontWeight: 'bold',
+                        width: '100%',
+                      }}
+                    >
+                      番号なし（{baseName}）
+                    </button>
 
-                  {/* ① 〜 ⑨ のグリッド */}
-                  <div className="button-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-                    {circleNumbers.map((num) => {
-                      const fullName = `${baseName}${num}`;
-                      const isSelected = currentSelectedFullName === fullName;
+                    {/* ① 〜 ⑨ のグリッド */}
+                    <div className="button-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                      {circleNumbers.map((num) => {
+                        const fullName = `${baseName}${num}`;
+                        const isSelected = currentSelectedFullName === fullName;
 
-                      return (
-                        <button
-                          key={num}
-                          type="button"
-                          className={`btn ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleSelectLocationNumber(num)}
-                          style={{
-                            height: '44px',
-                            fontSize: '1.1rem',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {num}
-                        </button>
-                      );
-                    })}
+                        return (
+                          <button
+                            key={num}
+                            type="button"
+                            className={`btn ${isSelected ? 'selected' : ''}`}
+                            onClick={() => handleSelectLocationNumber(num)}
+                            style={{
+                              height: '44px',
+                              fontSize: '1.1rem',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {num}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '12px' }}>
-                {currentSelectedFullName ? (
+                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginTop: '12px' }}>
+                  {currentSelectedFullName ? (
+                    <button
+                      type="button"
+                      className="btn-danger"
+                      onClick={() => handleSelectLocationNumber(null)}
+                      style={{ flex: 1, padding: '8px 12px' }}
+                    >
+                      選択解除
+                    </button>
+                  ) : (
+                    <div style={{ flex: 1 }} />
+                  )}
+
                   <button
                     type="button"
-                    className="btn-danger"
-                    onClick={() => handleSelectLocationNumber(null)}
-                    style={{ flex: 1, padding: '8px 12px' }}
+                    onClick={() => setLocationModalBtn(null)}
+                    style={{ minWidth: '80px', padding: '8px 12px' }}
                   >
-                    選択解除
+                    閉じる
                   </button>
-                ) : (
-                  <div style={{ flex: 1 }} />
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setLocationModalBtn(null)}
-                  style={{ minWidth: '80px', padding: '8px 12px' }}
-                >
-                  閉じる
-                </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
-    </main>
+          );
+        })()
+      }
+    </main >
   );
 };

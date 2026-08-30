@@ -10,28 +10,18 @@ import { AllTextPreviewPanel } from './components/AllTextPreviewPanel';
 const STORAGE_KEY_TABS = 'btn_text_gen_tabs_v4';
 const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
 const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
-const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v6';
-const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v1';
+const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v7';
+const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v2';
 
 const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
-  { id: 'btn-1', name: '床きしみ', category: '損傷' },
-  { id: 'btn-2', name: '建具すれ', category: '損傷' },
-  { id: 'btn-3', name: 'クロス隙間', category: '損傷' },
-  { id: 'btn-4', name: '畳隙間', category: '損傷' },
-  { id: 'btn-5', name: '襖開閉不良', category: '損傷' },
-  { id: 'btn-6', name: 'サッシ建付調整', category: '損傷' },
-  { id: 'btn-7', name: '床鳴り', category: '損傷' },
-  { id: 'btn-8', name: '傾斜不良', category: '損傷' },
-  { id: 'btn-9', name: '和室', category: '場所' },
-  { id: 'btn-10', name: '洋室', category: '場所' },
+  { id: 'btn-1', name: '和室', category: '場所' },
+  { id: 'btn-2', name: 'クロス切', category: '損傷' },
+  { id: 'btn-3', name: '壁', category: '部位' },
+  { id: 'btn-4', name: '1階', category: '階数' },
 ];
 
 const DEFAULT_EXTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
-  { id: 'ext-btn-1', name: 'ひび割れ', category: '損傷' },
-  { id: 'ext-btn-2', name: '水切り隙間', category: '損傷' },
-  { id: 'ext-btn-3', name: '樋歪み', category: '損傷' },
-  { id: 'ext-btn-4', name: 'コケ付着', category: '損傷' },
-  { id: 'ext-btn-5', name: '塗膜剥離', category: '損傷' },
+  { id: 'ext-btn-1', name: 'グラツキ', category: '損傷' },
 ];
 
 const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelection => ({

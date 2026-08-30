@@ -10,8 +10,8 @@ import { AllTextPreviewPanel } from './components/AllTextPreviewPanel';
 const STORAGE_KEY_TABS = 'btn_text_gen_tabs_v4';
 const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
 const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
-const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v7';
-const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v2';
+const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v8';
+const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v3';
 
 const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
   { id: 'btn-1', name: '和室', category: '場所' },
@@ -89,7 +89,7 @@ export const App: React.FC = () => {
 
   const [internalCustomButtons, setInternalCustomButtons] = useState<CustomButtonConfig[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS) || localStorage.getItem(STORAGE_KEY_CUSTOM_BUTTONS);
+      const saved = localStorage.getItem(STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {

@@ -46,24 +46,91 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef(false);
+  const textRef = useRef('');
+  const categoryRef = useRef<CustomButtonCategory>(defaultCategory);
+  const isRegisteredRef = useRef(false);
 
   useEffect(() => {
     isListeningRef.current = isListening;
   }, [isListening]);
 
+  useEffect(() => {
+    textRef.current = text;
+  }, [text]);
+
+  useEffect(() => {
+    categoryRef.current = category;
+  }, [category]);
+
+  const stopRecognition = () => {
+    isListeningRef.current = false;
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
+  // 音声認識結果のテキストからコマンド検知・登録・停止を判定する共通ハンドラー
+  const processVoiceResult = (rawTranscript: string) => {
+    if (isRegisteredRef.current) return;
+
+    let processed = rawTranscript;
+
+    // 1. 「登録」音声コマンド検知（例: "2階廊下 登録", "2階廊下とうろく", "登録" など）
+    const registerRegex = /[\s　]*(?:登録|とうろく|登録する|とうろくする|決定|けってい)$/i;
+    if (registerRegex.test(processed)) {
+      const cleaned = processed.replace(registerRegex, '').trim();
+      const finalVal = cleaned || textRef.current.trim();
+      if (finalVal) {
+        isRegisteredRef.current = true;
+        stopRecognition();
+        onRegister(finalVal, categoryRef.current);
+        onClose();
+        return;
+      }
+    }
+
+    // 2. 「ストップ」「一時停止」音声コマンド検知（例: "2階廊下 ストップ", "ストップ", "一時停止" など）
+    const stopRegex = /[\s　]*(?:ストップ|すをとっぷ|すっとっぷ|stop|一時停止|いちじていし|終了|しゅうりょう)$/i;
+    if (stopRegex.test(processed)) {
+      const cleaned = processed.replace(stopRegex, '').trim();
+      if (cleaned) {
+        setText(cleaned);
+        textRef.current = cleaned;
+      }
+      stopRecognition();
+      return;
+    }
+
+    // 3. 通常の入力テキスト反映
+    if (processed.trim()) {
+      setText(processed);
+      textRef.current = processed;
+    }
+  };
+
   // モーダルオープン時の初期化・音声認識開始
   useEffect(() => {
     if (!isOpen) {
-      // モーダルが閉じた時は停止・リセット
       stopRecognition();
       setText('');
+      textRef.current = '';
       setErrorMessage(null);
+      isRegisteredRef.current = false;
       return;
     }
 
     setCategory(defaultCategory);
+    categoryRef.current = defaultCategory;
     setText('');
+    textRef.current = '';
     setErrorMessage(null);
+    isRegisteredRef.current = false;
 
     const win = window as unknown as IWindow;
     const SpeechRecognitionAPI = win.SpeechRecognition || win.webkitSpeechRecognition;
@@ -102,7 +169,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
         const combined = (finalTranscript + interimTranscript).trim();
         if (combined) {
-          setText(combined);
+          processVoiceResult(combined);
         }
       };
 
@@ -112,14 +179,14 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           setErrorMessage('マイクへのアクセスが許可されていません。ブラウザ設定でマイクを許可してください。');
           setIsListening(false);
         } else if (event.error === 'no-speech') {
-          // 音声が検出されなかっただけなのでエラー表示は不要
+          // 音声未検出
         } else {
           setErrorMessage(`音声認識エラー: ${event.error}`);
         }
       };
 
       recognition.onend = () => {
-        // ユーザーが停止していないのにブラウザ側で終了した場合（無音タイムアウト等）、モーダルが開いていれば再開
+        if (isRegisteredRef.current) return;
         if (isListeningRef.current) {
           try {
             recognition.start();
@@ -143,19 +210,6 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       stopRecognition();
     };
   }, [isOpen]);
-
-  const stopRecognition = () => {
-    isListeningRef.current = false;
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // ignore
-      }
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -191,7 +245,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
           const combined = (finalTranscript + interimTranscript).trim();
           if (combined) {
-            setText(combined);
+            processVoiceResult(combined);
           }
         };
 
@@ -203,6 +257,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         };
 
         recognition.onend = () => {
+          if (isRegisteredRef.current) return;
           if (isListeningRef.current) {
             try {
               recognition.start();
@@ -226,11 +281,13 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
   const handleClear = () => {
     setText('');
+    textRef.current = '';
   };
 
   const handleRegister = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    isRegisteredRef.current = true;
     stopRecognition();
     onRegister(trimmed, category);
     onClose();
@@ -248,7 +305,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       <div
         className="modal-card voice-input-modal-card"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '420px', width: '92%' }}
+        style={{ maxWidth: '420px', width: '92%', padding: '16px' }}
       >
         {/* モーダルヘッダー */}
         <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: '10px' }}>
@@ -267,31 +324,31 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           </button>
         </div>
 
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* 音声認識ステータス / マイクコントロール */}
           <div
             className={`voice-status-box ${isListening ? 'listening' : 'paused'}`}
             style={{
-              padding: '12px 14px',
+              padding: '10px 12px',
               borderRadius: '10px',
               border: `2px solid ${isListening ? '#818cf8' : '#e2e8f0'}`,
               backgroundColor: isListening ? '#f5f3ff' : '#f8fafc',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              gap: '10px',
+              gap: '8px',
               transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div className={`voice-pulse-circle ${isListening ? 'active' : ''}`}>
-                {isListening ? <Mic size={20} color="#ffffff" /> : <MicOff size={20} color="#94a3b8" />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <div className={`voice-pulse-circle ${isListening ? 'active' : ''}`} style={{ flexShrink: 0 }}>
+                {isListening ? <Mic size={18} color="#ffffff" /> : <MicOff size={18} color="#94a3b8" />}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: isListening ? '#4338ca' : '#64748b' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <span style={{ fontWeight: 'bold', fontSize: '0.88rem', color: isListening ? '#4338ca' : '#64748b', whiteSpace: 'nowrap' }}>
                   {isListening ? '音声を聞き取り中...' : '音声入力を一時停止中'}
                 </span>
-                <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                <span style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap' }}>
                   {isListening ? 'マイクに向かって話してください' : 'タップして聞き取りを再開'}
                 </span>
               </div>
@@ -310,11 +367,31 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
                   borderColor: isListening ? '#c7d2fe' : '#4338ca',
                   borderRadius: '6px',
                   fontWeight: 'bold',
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {isListening ? '一時停止' : '再開'}
               </button>
             )}
+          </div>
+
+          {/* 音声コマンド案内バッジ */}
+          <div
+            style={{
+              backgroundColor: '#eff6ff',
+              border: '1px solid #bfdbfe',
+              borderRadius: '6px',
+              padding: '6px 10px',
+              fontSize: '0.75rem',
+              color: '#1e40af',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span style={{ fontWeight: 'bold' }}>💡 音声操作:</span>
+            <span>「<strong>ストップ</strong>」で一時停止 / 「<strong>登録</strong>」で決定</span>
           </div>
 
           {errorMessage && (
@@ -351,7 +428,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
                     className={`btn ${isSelected ? 'selected' : ''}`}
                     onClick={() => setCategory(cat.label)}
                     style={{
-                      height: '40px',
+                      height: '38px',
                       fontSize: '0.9rem',
                       fontWeight: 'bold',
                       borderRadius: '8px',
@@ -363,6 +440,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
                       backgroundColor: isSelected ? '#1e293b' : '#ffffff',
                       color: isSelected ? '#ffffff' : '#334155',
                       borderColor: isSelected ? '#1e293b' : '#cbd5e1',
+                      padding: '0',
                     }}
                   >
                     <span>{cat.label}</span>
@@ -423,17 +501,17 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           </div>
         </div>
 
-        {/* モーダルフッター（クリア・キャンセル・登録） */}
+        {/* モーダルフッター（クリア・キャンセル・登録） - スマホでも崩れない3分割グリッド */}
         <div
-          className="modal-footer"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1.25fr',
             gap: '8px',
             borderTop: '2px solid var(--border-color)',
             paddingTop: '12px',
-            marginTop: '6px',
+            marginTop: '8px',
+            width: '100%',
+            boxSizing: 'border-box',
           }}
         >
           <button
@@ -442,64 +520,73 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             onClick={handleClear}
             disabled={!text}
             style={{
-              padding: '10px 12px',
-              fontSize: '0.85rem',
+              height: '42px',
+              padding: '0 6px',
+              fontSize: '0.88rem',
               fontWeight: 'bold',
               color: '#dc2626',
               backgroundColor: '#fee2e2',
               borderColor: '#fca5a5',
               borderRadius: '8px',
-              display: 'flex',
+              display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: '4px',
+              whiteSpace: 'nowrap',
               opacity: !text ? 0.5 : 1,
               cursor: !text ? 'not-allowed' : 'pointer',
             }}
           >
-            <RotateCcw size={15} />
-            クリア
+            <RotateCcw size={15} style={{ flexShrink: 0 }} />
+            <span>クリア</span>
           </button>
 
-          <div style={{ display: 'flex', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              className="btn"
-              onClick={handleClose}
-              style={{
-                padding: '10px 14px',
-                fontSize: '0.9rem',
-                fontWeight: 'bold',
-                borderRadius: '8px',
-              }}
-            >
-              キャンセル
-            </button>
+          <button
+            type="button"
+            className="btn"
+            onClick={handleClose}
+            style={{
+              height: '42px',
+              padding: '0 6px',
+              fontSize: '0.88rem',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              whiteSpace: 'nowrap',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <span>キャンセル</span>
+          </button>
 
-            <button
-              type="button"
-              className="btn"
-              onClick={handleRegister}
-              disabled={!text.trim()}
-              style={{
-                padding: '10px 18px',
-                fontSize: '0.95rem',
-                fontWeight: 'bold',
-                backgroundColor: '#4f46e5',
-                color: '#ffffff',
-                borderColor: '#4338ca',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                opacity: !text.trim() ? 0.5 : 1,
-                cursor: !text.trim() ? 'not-allowed' : 'pointer',
-                boxShadow: text.trim() ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
-              }}
-            >
-              <Check size={18} />
-              登録
-            </button>
-          </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={handleRegister}
+            disabled={!text.trim()}
+            style={{
+              height: '42px',
+              padding: '0 6px',
+              fontSize: '0.95rem',
+              fontWeight: 'bold',
+              backgroundColor: '#4f46e5',
+              color: '#ffffff',
+              borderColor: '#4338ca',
+              borderRadius: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap',
+              opacity: !text.trim() ? 0.5 : 1,
+              cursor: !text.trim() ? 'not-allowed' : 'pointer',
+              boxShadow: text.trim() ? '0 2px 8px rgba(79, 70, 229, 0.4)' : 'none',
+            }}
+          >
+            <Check size={18} style={{ flexShrink: 0 }} />
+            <span>登録</span>
+          </button>
         </div>
       </div>
     </div>

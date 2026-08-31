@@ -136,6 +136,22 @@ export function getLineComponents(
     }
   });
 
+  // 音声入力によって登録された文字列の合流
+  if (selection.voiceItems && selection.voiceItems.length > 0) {
+    selection.voiceItems.forEach((vItem) => {
+      if (vItem.category === '場所') {
+        locationNames.push(vItem.text);
+      } else if (vItem.category === '階数') {
+        floorNames.push(vItem.text);
+      } else if (vItem.category === '部位') {
+        partNames.push(vItem.text);
+      } else if (vItem.category === '損傷') {
+        customDamageItemsList.push({ name: vItem.text, valueW: 0, valueL: 0 });
+        customDamageStrings.push(vItem.text);
+      }
+    });
+  }
+
   if (isInternal) {
     const buildingStr = selection.location?.isBuilding ? '建物' : '';
     const location = [buildingStr, ...locationNames].filter(Boolean).join('');

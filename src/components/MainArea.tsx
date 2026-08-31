@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory } from '../types';
-import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical } from 'lucide-react';
+import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
+import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic } from 'lucide-react';
+import { VoiceInputModal } from './VoiceInputModal';
 
 interface MainAreaProps {
   surveyType: SurveyType;
@@ -23,6 +24,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
   onChangeInternalCustomButtons,
   onChangeExternalCustomButtons,
 }) => {
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const isLocationDisabled = selection.part === '塀' || selection.part === '土間';
 
   // ① 場所グループハンドラー
@@ -265,8 +267,35 @@ export const MainArea: React.FC<MainAreaProps> = ({
   const [locationModalBtn, setLocationModalBtn] = useState<CustomButtonConfig | null>(null);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // 音声入力による文字列登録ハンドラー
+  const handleRegisterVoiceText = (voiceText: string, category: CustomButtonCategory) => {
+    const newItem: VoiceInputItem = {
+      id: `voice-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      text: voiceText,
+      category,
+    };
+    const currentVoiceItems = selection.voiceItems || [];
+    onChangeSelection({
+      ...selection,
+      voiceItems: [...currentVoiceItems, newItem],
+    });
+  };
+
+  // 音声入力で追加された項目の削除ハンドラー
+  const handleRemoveVoiceItem = (id: string) => {
+    const currentVoiceItems = selection.voiceItems || [];
+    onChangeSelection({
+      ...selection,
+      voiceItems: currentVoiceItems.filter((item) => item.id !== id),
+    });
+  };
+
   const handleToggleCustomSelection = (btnName: string) => {
     const btnConfig = customButtons.find((b) => b.name === btnName);
+    if (btnConfig?.isVoice || btnName === '音声入力') {
+      setIsVoiceModalOpen(true);
+      return;
+    }
     if (btnConfig?.category === '場所') {
       setLocationModalBtn(btnConfig);
       return;
@@ -506,6 +535,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handleToggleCategory = (id: string) => {
+    const target = customButtons.find((b) => b.id === id);
+    if (target?.isVoice || target?.name === '音声入力') return;
+
     const updated = customButtons.map((btn) => {
       if (btn.id === id) {
         const categories: CustomButtonCategory[] = ['損傷', '場所', '階数', '部位'];
@@ -519,6 +551,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handleRemoveCustomButton = (id: string, name: string) => {
+    const target = customButtons.find((b) => b.id === id);
+    if (target?.isVoice || name === '音声入力') {
+      alert('音声入力ボタンは削除できません。');
+      return;
+    }
     if (!confirm(`「${name}」ボタンを削除してもよろしいですか？`)) return;
     onChangeCustomButtons(customButtons.filter((b) => b.id !== id));
     if (currentCustomSelections.some((item) => item === name || item.startsWith(name))) {
@@ -616,6 +653,84 @@ export const MainArea: React.FC<MainAreaProps> = ({
         </button>
       </div>
 
+      {/* 音声入力で追加された項目タグ一覧 */}
+      {selection.voiceItems && selection.voiceItems.length > 0 && (
+        <div
+          style={{
+            backgroundColor: '#f5f3ff',
+            border: '1.5px solid #c7d2fe',
+            borderRadius: '8px',
+            padding: '8px 10px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            marginBottom: '4px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#4338ca', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Mic size={14} />
+              音声入力で追加された項目 ({selection.voiceItems.length}件):
+            </span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {selection.voiceItems.map((item) => (
+              <span
+                key={item.id}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #818cf8',
+                  borderRadius: '6px',
+                  padding: '2px 8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 'bold',
+                  color: '#312e81',
+                }}
+              >
+                <span
+                  className={`category-badge ${
+                    item.category === '場所'
+                      ? 'category-location'
+                      : item.category === '階数'
+                        ? 'category-floor'
+                        : item.category === '部位'
+                          ? 'category-part'
+                          : 'category-damage'
+                  }`}
+                  style={{ fontSize: '0.62rem', padding: '0 4px' }}
+                >
+                  {item.category}
+                </span>
+                <span>{item.text}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveVoiceItem(item.id)}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    padding: '0 2px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: '#ef4444',
+                    fontWeight: 'bold',
+                    fontSize: '0.95rem',
+                    lineHeight: 1,
+                    marginLeft: '2px',
+                  }}
+                  title="削除"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {isModeInternal ? (
         <>
           {/* ① 内部用カスタムボタン選択エリア */}
@@ -653,6 +768,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             ) : (
               <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 {customButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
                   const baseName = btnConfig.name;
                   const isLocation = btnConfig.category === '場所';
                   const selectedIndex = currentCustomSelections.findIndex(
@@ -664,6 +780,57 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   const isSelected = selectedIndex !== -1;
                   const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
                   const isDraggingThis = draggedIdx === idx;
+
+                  if (isVoice) {
+                    return (
+                      <button
+                        key={btnConfig.id}
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
+                        onClick={() => setIsVoiceModalOpen(true)}
+                        style={{
+                          height: '52px',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          cursor: 'grab',
+                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                          borderColor: '#6366f1',
+                          borderWidth: '2px',
+                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Mic size={16} color="#4f46e5" />
+                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
+                          タップして音声入力
+                        </span>
+                      </button>
+                    );
+                  }
 
                   return (
                     <button
@@ -1261,79 +1428,152 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   backgroundColor: '#ffffff',
                 }}
               >
-                {customButtons.map((btnConfig, idx) => (
-                  <div
-                    key={btnConfig.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, idx)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, idx)}
-                    className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      backgroundColor: '#f8f9fa',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                      cursor: 'grab',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <GripVertical size={16} color="#888" />
-                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleCategory(btnConfig.id)}
-                        className={`category-badge ${btnConfig.category === '場所'
-                          ? 'category-location'
-                          : btnConfig.category === '階数'
-                            ? 'category-floor'
-                            : btnConfig.category === '部位'
-                              ? 'category-part'
-                              : 'category-damage'
-                          }`}
-                        style={{ cursor: 'pointer', border: 'none' }}
-                        title="クリックして種類切り替え"
-                      >
-                        {btnConfig.category} (切替)
-                      </button>
-                    </div>
+                {customButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => handleMoveCustomButton(idx, -1)}
-                        disabled={idx === 0}
-                        style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                        title="上に移動"
+                  if (isVoice) {
+                    return (
+                      <div
+                        key={btnConfig.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 8px',
+                          backgroundColor: '#f5f3ff',
+                          borderRadius: '4px',
+                          border: '1.5px solid #818cf8',
+                          cursor: 'grab',
+                        }}
                       >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => handleMoveCustomButton(idx, 1)}
-                        disabled={idx === customButtons.length - 1}
-                        style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                        title="下に移動"
-                      >
-                        ▼
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
-                        style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
-                        title="削除"
-                      >
-                        削除
-                      </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <GripVertical size={16} color="#6366f1" />
+                          <Mic size={15} color="#4f46e5" />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#312e81' }}>{btnConfig.name}</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声 (固定)
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, -1)}
+                            disabled={idx === 0}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="上に移動"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, 1)}
+                            disabled={idx === customButtons.length - 1}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="下に移動"
+                          >
+                            ▼
+                          </button>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', padding: '0 4px' }}>
+                            削除不可
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={btnConfig.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        cursor: 'grab',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <GripVertical size={16} color="#888" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategory(btnConfig.id)}
+                          className={`category-badge ${btnConfig.category === '場所'
+                            ? 'category-location'
+                            : btnConfig.category === '階数'
+                              ? 'category-floor'
+                              : btnConfig.category === '部位'
+                                ? 'category-part'
+                                : 'category-damage'
+                            }`}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                          title="クリックして種類切り替え"
+                        >
+                          {btnConfig.category} (切替)
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, -1)}
+                          disabled={idx === 0}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="上に移動"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, 1)}
+                          disabled={idx === customButtons.length - 1}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="下に移動"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
+                          style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
+                          title="削除"
+                        >
+                          削除
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -1375,6 +1615,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             ) : (
               <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
                 {customButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
                   const baseName = btnConfig.name;
                   const isLocation = btnConfig.category === '場所';
                   const selectedIndex = currentCustomSelections.findIndex(
@@ -1386,6 +1627,57 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   const isSelected = selectedIndex !== -1;
                   const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
                   const isDraggingThis = draggedIdx === idx;
+
+                  if (isVoice) {
+                    return (
+                      <button
+                        key={btnConfig.id}
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
+                        onClick={() => setIsVoiceModalOpen(true)}
+                        style={{
+                          height: '52px',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          cursor: 'grab',
+                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                          borderColor: '#6366f1',
+                          borderWidth: '2px',
+                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Mic size={16} color="#4f46e5" />
+                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
+                          タップして音声入力
+                        </span>
+                      </button>
+                    );
+                  }
 
                   return (
                     <button
@@ -2308,79 +2600,152 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   backgroundColor: '#ffffff',
                 }}
               >
-                {customButtons.map((btnConfig, idx) => (
-                  <div
-                    key={btnConfig.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, idx)}
-                    onDragOver={handleDragOver}
-                    onDrop={(e) => handleDrop(e, idx)}
-                    className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '6px 8px',
-                      backgroundColor: '#f8f9fa',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                      cursor: 'grab',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <GripVertical size={16} color="#888" />
-                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleCategory(btnConfig.id)}
-                        className={`category-badge ${btnConfig.category === '場所'
-                          ? 'category-location'
-                          : btnConfig.category === '階数'
-                            ? 'category-floor'
-                            : btnConfig.category === '部位'
-                              ? 'category-part'
-                              : 'category-damage'
-                          }`}
-                        style={{ cursor: 'pointer', border: 'none' }}
-                        title="クリックして種類切り替え"
-                      >
-                        {btnConfig.category} (切替)
-                      </button>
-                    </div>
+                {customButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => handleMoveCustomButton(idx, -1)}
-                        disabled={idx === 0}
-                        style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                        title="上に移動"
+                  if (isVoice) {
+                    return (
+                      <div
+                        key={btnConfig.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 8px',
+                          backgroundColor: '#f5f3ff',
+                          borderRadius: '4px',
+                          border: '1.5px solid #818cf8',
+                          cursor: 'grab',
+                        }}
                       >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => handleMoveCustomButton(idx, 1)}
-                        disabled={idx === customButtons.length - 1}
-                        style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                        title="下に移動"
-                      >
-                        ▼
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger"
-                        onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
-                        style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
-                        title="削除"
-                      >
-                        削除
-                      </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <GripVertical size={16} color="#6366f1" />
+                          <Mic size={15} color="#4f46e5" />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#312e81' }}>{btnConfig.name}</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声 (固定)
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, -1)}
+                            disabled={idx === 0}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="上に移動"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, 1)}
+                            disabled={idx === customButtons.length - 1}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="下に移動"
+                          >
+                            ▼
+                          </button>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', padding: '0 4px' }}>
+                            削除不可
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={btnConfig.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        cursor: 'grab',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <GripVertical size={16} color="#888" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategory(btnConfig.id)}
+                          className={`category-badge ${btnConfig.category === '場所'
+                            ? 'category-location'
+                            : btnConfig.category === '階数'
+                              ? 'category-floor'
+                              : btnConfig.category === '部位'
+                                ? 'category-part'
+                                : 'category-damage'
+                            }`}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                          title="クリックして種類切り替え"
+                        >
+                          {btnConfig.category} (切替)
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, -1)}
+                          disabled={idx === 0}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="上に移動"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, 1)}
+                          disabled={idx === customButtons.length - 1}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="下に移動"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
+                          style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
+                          title="削除"
+                        >
+                          削除
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -2483,6 +2848,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
           );
         })()
       }
-    </main >
+
+      {/* 音声入力モーダル */}
+      <VoiceInputModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onRegister={handleRegisterVoiceText}
+      />
+    </main>
   );
 };

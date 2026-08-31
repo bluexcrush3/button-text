@@ -525,3 +525,63 @@ button.btn-danger:active {
   color: #d6336c;
   border: 1px solid #fcc2d7;
 }
+
+/* 音声入力特殊ボタン用スタイル */
+.custom-btn-voice {
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%) !important;
+  border-color: #6366f1 !important;
+  border-width: 2px !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.18) !important;
+  transition: all 0.15s ease !important;
+}
+
+.custom-btn-voice:hover {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%) !important;
+  border-color: #4f46e5 !important;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.25) !important;
+}
+
+.custom-btn-voice:active {
+  transform: scale(0.96) !important;
+  background: #c7d2fe !important;
+}
+
+/* 音声認識モーダル内のパルスアニメーション */
+.voice-pulse-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.voice-pulse-circle.active {
+  background-color: #ef4444;
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.voice-mic-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background-color: #eef2ff;
+  border-radius: 50%;
+}

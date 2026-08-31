@@ -13,7 +13,22 @@ const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
 const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v8';
 const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v3';
 
+export const VOICE_INPUT_INTERNAL_CONFIG: CustomButtonConfig = {
+  id: 'btn-voice-internal',
+  name: '音声入力',
+  category: '損傷',
+  isVoice: true,
+};
+
+export const VOICE_INPUT_EXTERNAL_CONFIG: CustomButtonConfig = {
+  id: 'ext-btn-voice-external',
+  name: '音声入力',
+  category: '損傷',
+  isVoice: true,
+};
+
 const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+  VOICE_INPUT_INTERNAL_CONFIG,
   { id: 'btn-1', name: '和室', category: '場所' },
   { id: 'btn-2', name: 'クロス切', category: '損傷' },
   { id: 'btn-3', name: '壁', category: '部位' },
@@ -21,8 +36,18 @@ const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
 ];
 
 const DEFAULT_EXTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+  VOICE_INPUT_EXTERNAL_CONFIG,
   { id: 'ext-btn-1', name: 'グラツキ', category: '損傷' },
 ];
+
+const ensureVoiceButton = (buttons: CustomButtonConfig[], voiceConfig: CustomButtonConfig): CustomButtonConfig[] => {
+  const hasVoice = buttons.some((b) => b.isVoice || b.name === '音声入力');
+  if (!hasVoice) {
+    return [voiceConfig, ...buttons];
+  }
+  // isVoiceプロパティが付与されていることを保証
+  return buttons.map((b) => (b.name === '音声入力' || b.id === voiceConfig.id ? { ...b, isVoice: true } : b));
+};
 
 const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelection => ({
   mode: defaultMode,
@@ -40,6 +65,7 @@ const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelecti
   internalDamages: [],
   externalSelections: [],
   externalDamages: [],
+  voiceItems: [],
 });
 
 const createInitialLine = (defaultMode: SurveyType = '外部'): LineData => ({
@@ -93,14 +119,17 @@ export const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          let list: CustomButtonConfig[];
           if (typeof parsed[0] === 'string') {
-            return parsed.map((name: string, i: number) => ({
+            list = parsed.map((name: string, i: number) => ({
               id: `btn-${Date.now()}-${i}`,
               name,
               category: '損傷',
             }));
+          } else {
+            list = parsed;
           }
-          return parsed;
+          return ensureVoiceButton(list, VOICE_INPUT_INTERNAL_CONFIG);
         }
       }
     } catch (e) {
@@ -115,14 +144,17 @@ export const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          let list: CustomButtonConfig[];
           if (typeof parsed[0] === 'string') {
-            return parsed.map((name: string, i: number) => ({
+            list = parsed.map((name: string, i: number) => ({
               id: `ext-btn-${Date.now()}-${i}`,
               name,
               category: '損傷',
             }));
+          } else {
+            list = parsed;
           }
-          return parsed;
+          return ensureVoiceButton(list, VOICE_INPUT_EXTERNAL_CONFIG);
         }
       }
     } catch (e) {

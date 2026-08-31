@@ -33,6 +33,13 @@ export interface CustomButtonConfig {
   id: string;
   name: string;
   category: CustomButtonCategory;
+  isVoice?: boolean;
+}
+
+export interface VoiceInputItem {
+  id: string;
+  text: string;
+  category: CustomButtonCategory;
 }
 
 export interface LineSelection {
@@ -46,6 +53,7 @@ export interface LineSelection {
   internalDamages?: DamageItem[]; // 内部モード用の損傷詳細情報
   externalSelections?: string[]; // 外部モード用の選択されたカスタム文字列リスト
   externalDamages?: DamageItem[]; // 外部モード用の損傷詳細情報
+  voiceItems?: VoiceInputItem[]; // 音声入力によって直接追加された文字列リスト
   mode?: SurveyType;           // この行の個別調査モード
 }
 

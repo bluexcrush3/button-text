@@ -1,8 +1,9 @@
 import React from 'react';
-import { TabData, CustomButtonConfig } from '../types';
+import { TabData, CustomButtonConfig, LineSelection } from '../types';
 import { getTabName } from '../utils/tabUtils';
 import { generateLineText } from '../utils/textGenerator';
 import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy, X } from 'lucide-react';
+import { VoiceDamageWButton } from './VoiceDamageWButton';
 
 interface HeaderProps {
   tabs: TabData[];
@@ -20,6 +21,8 @@ interface HeaderProps {
   canPrev: boolean;
   canCopyPrev: boolean;
   customButtons?: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] };
+  currentSelection?: LineSelection;
+  onChangeSelection?: (newSelection: LineSelection) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +41,8 @@ export const Header: React.FC<HeaderProps> = ({
   canPrev,
   canCopyPrev,
   customButtons = [],
+  currentSelection,
+  onChangeSelection,
 }) => {
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -146,6 +151,14 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+            {/* 一括W音声入力ボタン（「＋」ボタンの左隣り） */}
+            {currentSelection && onChangeSelection && (
+              <VoiceDamageWButton
+                selection={currentSelection}
+                onChangeSelection={onChangeSelection}
+              />
+            )}
+
             {/* 「＋」行挿入ボタン */}
             <button
               type="button"

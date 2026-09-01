@@ -437,6 +437,8 @@ export const App: React.FC = () => {
         canPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
         canCopyPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
         customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
+        currentSelection={currentSelection}
+        onChangeSelection={handleChangeSelection}
       />
 
       {/* メイン操作エリア */}

@@ -81,8 +81,8 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
     let processed = rawTranscript;
 
-    // 1. 「登録」音声コマンド検知（例: "2階廊下 登録", "2階廊下とうろく", "登録" など）
-    const registerRegex = /[\s　]*(?:登録|とうろく|登録する|とうろくする|決定|けってい)$/i;
+    // 1. 「登録」「確定」「決定」「以上」「完了」音声コマンド検知
+    const registerRegex = /[\s　]*(?:登録|とうろく|登録する|とうろくする|決定|けってい|確定|かくてい|以上|いじょう|完了|かんりょう|終わり|おわり)$/i;
     if (registerRegex.test(processed)) {
       const cleaned = processed.replace(registerRegex, '').trim();
       const finalVal = cleaned || textRef.current.trim();
@@ -95,7 +95,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
       }
     }
 
-    // 2. 「ストップ」「一時停止」音声コマンド検知（例: "2階廊下 ストップ", "ストップ", "一時停止" など）
+    // 2. 「ストップ」「一時停止」「終了」音声コマンド検知
     const stopRegex = /[\s　]*(?:ストップ|すをとっぷ|すっとっぷ|stop|一時停止|いちじていし|終了|しゅうりょう)$/i;
     if (stopRegex.test(processed)) {
       const cleaned = processed.replace(stopRegex, '').trim();
@@ -391,7 +391,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             }}
           >
             <span style={{ fontWeight: 'bold' }}>💡 音声操作:</span>
-            <span>「<strong>ストップ</strong>」で一時停止 / 「<strong>登録</strong>」で決定</span>
+            <span>「<strong>ストップ</strong>」で一時停止 / 「<strong>登録</strong>」「<strong>確定</strong>」「<strong>以上</strong>」で決定</span>
           </div>
 
           {errorMessage && (

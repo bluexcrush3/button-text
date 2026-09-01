@@ -12,7 +12,12 @@ export interface VoiceDamageParseResult {
   damages: ParsedDamageW[];
   rawText: string;
   feedbackText: string;
+  hasEndCommand: boolean; // 「確定」「以上」などの終了キーワードが含まれていたか
 }
+
+/** 終了を知らせるボイスコマンドキーワード */
+export const VOICE_END_COMMANDS_REGEX =
+  /(?:確定|かくてい|決定|けってい|以上|いじょう|完了|かんりょう|終わり|おわり|登録|とうろく|ストップ|すっとっぷ|オーケー|OK)$/i;
 
 /**
  * 漢数字・全角数字・ひらがなの数詞・小数点を半角アラビア数字文字列に変換する
@@ -25,38 +30,37 @@ export function normalizeJapaneseNumbers(text: string): string {
   s = s.replace(/　/g, ' ');
 
   // 50の読み
-  s = s.replace(/ごじゅう|五十/gi, '50');
-  // 小数点の表現
-  s = s.replace(/れいてん|ぜろてん|ゼロ点|零点|れい点/gi, '0.');
-  s = s.replace(/てん|点/gi, '.');
+  s = s.replace(/ごじゅう|五十|五〇|５０/gi, '50');
 
-  // 単独の「.3」「.5」等を「0.3」「0.5」に補正
+  // 小数点の表現 ("0点3", "零点三", "れいてんさん", "0てん3", "点3" など)
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:ゼロ|ぜろ|零|0)/gi, '0.0');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:いち|一|1)/gi, '0.1');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:に|二|2)/gi, '0.2');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:さん|三|3)/gi, '0.3');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:よん|四|4)/gi, '0.4');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:ご|五|5)/gi, '0.5');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:ろく|六|6)/gi, '0.6');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:なな|七|7)/gi, '0.7');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:はち|八|8)/gi, '0.8');
+  s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:きゅう|九|9)/gi, '0.9');
+
+  // 数字 + 点/てん + 数字 (例: "1点5" -> "1.5", "0点25" -> "0.25")
+  s = s.replace(/(\d+)\s*(?:点|てん)\s*(\d+)/gi, '$1.$2');
+
+  // 単独の ".3" や ".5" を "0.3", "0.5" に補正
   s = s.replace(/(^|[^\d])\.(\d+)/g, '$1 0.$2');
 
-  // ひらがな数字・漢数字変換テーブル
-  const kanjiMap: { [key: string]: number } = {
-    'ぜろ': 0, 'ゼロ': 0, '〇': 0, '零': 0,
-    'いち': 1, 'イチ': 1, '一': 1, '壱': 1,
-    'に': 2, 'ニ': 2, '二': 2, '弐': 2,
-    'さん': 3, 'サン': 3, '三': 3, '参': 3,
-    'よん': 4, 'ヨン': 4, 'し': 4, '四': 4,
-    'ご': 5, 'ゴ': 5, '五': 5,
-    'ろく': 6, 'ロク': 6, '六': 6,
-    'なな': 7, 'ナナ': 7, 'しち': 7, '七': 7,
-    'はち': 8, 'ハチ': 8, '八': 8,
-    'きゅう': 9, 'キュウ': 9, 'く': 9, '九': 9,
-  };
-
-  for (const [k, v] of Object.entries(kanjiMap)) {
-    s = s.split(k).join(v.toString());
-  }
-
-  // 「十」を含む数値の簡単な処理 (例: 十五 -> 15, 二十 -> 20, 三十 -> 30)
-  s = s.replace(/(\d*)十(\d*)/g, (_, tens, ones) => {
-    const t = tens ? parseInt(tens, 10) : 1;
-    const o = ones ? parseInt(ones, 10) : 0;
-    return (t * 10 + o).toString();
-  });
+  // 単一の漢数字/カタカナ/ひらがな数詞変換 (安全な文脈で置換)
+  s = s.replace(/零|ゼロ|ぜろ/g, '0');
+  s = s.replace(/一|イチ|いち/g, '1');
+  s = s.replace(/二|ニ|に/g, '2');
+  s = s.replace(/三|サン|さん/g, '3');
+  s = s.replace(/四|ヨン|よん/g, '4');
+  s = s.replace(/五|ゴ|ご/g, '5');
+  s = s.replace(/六|ロク|ろく/g, '6');
+  s = s.replace(/七|ナナ|なな|しち/g, '7');
+  s = s.replace(/八|ハチ|はち/g, '8');
+  s = s.replace(/九|キュウ|きゅう/g, '9');
 
   return s;
 }
@@ -68,7 +72,7 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
   const cleaned = segment.trim();
   if (!cleaned) return null;
 
-  // 1. クリア / ゼロ
+  // 1. クリア / ゼロ / なし
   if (/^(?:クリア|リセット|ゼロ|なし|消去|0)$/i.test(cleaned)) {
     return { valueW: 0, preset: null };
   }
@@ -115,16 +119,29 @@ export function parseVoiceDamageW(
       damages: [],
       rawText: rawTranscript,
       feedbackText: '音声が聞き取れませんでした。',
+      hasEndCommand: false,
     };
   }
 
-  let text = normalizeJapaneseNumbers(rawTranscript);
+  const rawTrimmed = rawTranscript.trim();
+
+  // 終了コマンドの検知
+  let hasEndCommand = false;
+  let textForParsing = rawTrimmed;
+
+  // 終了キーワードのチェックと除去
+  if (VOICE_END_COMMANDS_REGEX.test(textForParsing)) {
+    hasEndCommand = true;
+    textForParsing = textForParsing.replace(VOICE_END_COMMANDS_REGEX, '').trim();
+  }
+
+  let text = normalizeJapaneseNumbers(textForParsing || rawTrimmed);
 
   // 不要語の除去
   text = text.replace(/ダブリュー|ダブル|だぶりゅー|\bW\b|\bw\b|幅|はば|巾/gi, ' ');
   text = text.replace(/ミリ|mm|センチ|cm|メートル|m/gi, ' ');
   text = text.replace(/数値|すうち|あたい|値|寸法/gi, ' ');
-  text = text.replace(/です|ます|登録|設定|入力|お願い|にして/gi, ' ');
+  text = text.replace(/です|ます|登録|設定|入力|お願い|にして|で/gi, ' ');
 
   text = text.trim();
 
@@ -139,13 +156,14 @@ export function parseVoiceDamageW(
         damages,
         rawText: rawTranscript,
         feedbackText: formatFeedbackText(damages),
+        hasEndCommand,
       };
     }
   }
 
-  // 2. 「1つめ/1番」「2つめ/2番」などの明示的な指定の抽出
-  const firstMatch = text.match(/(?:1つめ|1個め|1番目|1番|1)\s*[:：はが]?\s*([^2２]+)/);
-  const secondMatch = text.match(/(?:2つめ|2個め|2番目|2番|2)\s*[:：はが]?\s*(.+)/);
+  // 2. 「1つ目/1番/左/上/前」「2つ目/2番/右/下/後」などの明確な位置・順番指定の抽出
+  const firstMatch = text.match(/(?:1つ目|1つめ|1個目|1個め|1番目|1番|ひとつめ|左|上|前)\s*[:：はがで]?\s*([^2２ふた右上後]+)/);
+  const secondMatch = text.match(/(?:2つ目|2つめ|2個目|2個め|2番目|2番|ふたつめ|右|下|後)\s*[:：はがで]?\s*(.+)/);
   if (firstMatch || secondMatch) {
     const item1 = firstMatch ? parseSingleDamageItem(firstMatch[1]) : null;
     const item2 = secondMatch ? parseSingleDamageItem(secondMatch[1]) : null;
@@ -160,15 +178,19 @@ export function parseVoiceDamageW(
         damages,
         rawText: rawTranscript,
         feedbackText: formatFeedbackText(damages),
+        hasEndCommand,
       };
     }
   }
 
-  // 3. 区切り文字（「と」「、」「,」「スペース」「および」「アンド」）による分割
-  const splitPattern = /(?:[\s,、\/／]+|(?<=[^\d])と(?=[^\d])|(?<=\d)と(?=\d)|および|アンド|&)+/;
+  // 3. 全体からのアイテム（数値、全般、多数、50、クリア）抽出
+  // テキスト全体を走査して項目を順番に取得
+  const parsedItems: ParsedDamageW[] = [];
+
+  // 区切り文字（「と」「、」「,」「スペース」「および」「アンド」「&」「/」）による分割
+  const splitPattern = /(?:[\s,、\/／&]+|(?<=[^\d])と(?=[^\d])|(?<=\d)と(?=\d)|および|アンド)+/;
   const parts = text.split(splitPattern).filter(Boolean);
 
-  const parsedItems: ParsedDamageW[] = [];
   for (const part of parts) {
     const item = parseSingleDamageItem(part);
     if (item) {
@@ -179,7 +201,7 @@ export function parseVoiceDamageW(
     }
   }
 
-  // もし分割で取れなかった場合、テキスト全体から数値をすべて抽出
+  // 4. もし分割で取れなかった場合、テキスト全体から数値を順番にすべて抽出
   if (parsedItems.length === 0) {
     const allNums = text.match(/\b\d+(?:\.\d+)?\b/g);
     if (allNums && allNums.length > 0) {
@@ -198,6 +220,7 @@ export function parseVoiceDamageW(
       damages: parsedItems,
       rawText: rawTranscript,
       feedbackText: formatFeedbackText(parsedItems),
+      hasEndCommand,
     };
   }
 
@@ -206,6 +229,7 @@ export function parseVoiceDamageW(
     damages: [],
     rawText: rawTranscript,
     feedbackText: `認識できませんでした（発話:「${rawTranscript}」）。「0.3」や「0.3と0.5」のように話してください。`,
+    hasEndCommand,
   };
 }
 
@@ -225,3 +249,4 @@ function formatFeedbackText(items: ParsedDamageW[]): string {
     })
     .join(' / ');
 }
+

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { LineSelection, DamageItem } from '../types';
 import { parseVoiceDamageW } from '../utils/voiceDamageParser';
-import { Mic, MicOff, Check, AlertCircle } from 'lucide-react';
+import { Mic, MicOff, Check, AlertCircle, Square } from 'lucide-react';
 
 interface IWindow extends Window {
   webkitSpeechRecognition?: any;
@@ -18,27 +18,31 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
   onChangeSelection,
 }) => {
   const [isListening, setIsListening] = useState(false);
+  const [interimText, setInterimText] = useState<string>('');
   const [feedback, setFeedback] = useState<{
     type: 'info' | 'success' | 'warning' | 'error';
     text: string;
     subText?: string;
+    canManualConfirm?: boolean;
   } | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef(false);
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTranscriptRef = useRef<string>('');
 
   // フィードバック表示ヘルパー
   const showFeedback = (
     type: 'info' | 'success' | 'warning' | 'error',
     text: string,
     subText?: string,
-    durationMs: number = 3500
+    durationMs: number = 3500,
+    canManualConfirm: boolean = false
   ) => {
     if (feedbackTimerRef.current) {
       clearTimeout(feedbackTimerRef.current);
     }
-    setFeedback({ type, text, subText });
+    setFeedback({ type, text, subText, canManualConfirm });
     if (durationMs > 0) {
       feedbackTimerRef.current = setTimeout(() => {
         setFeedback(null);
@@ -57,6 +61,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       recognitionRef.current = null;
     }
     setIsListening(false);
+    setInterimText('');
   };
 
   useEffect(() => {
@@ -114,6 +119,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
 
     if (!parseResult.success || parseResult.damages.length === 0) {
       showFeedback('warning', '音声を認識できませんでした', `発話:「${rawTranscript}」`);
+      stopRecognition();
       return;
     }
 
@@ -150,13 +156,22 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
 
     onChangeSelection(newSelection);
     stopRecognition();
-    showFeedback('success', 'W値を入力しました', parseResult.feedbackText);
+    showFeedback('success', 'W値を入力しました', parseResult.feedbackText, 3500);
+  };
+
+  // 手動で現在の認識テキストで即時確定する処理
+  const handleManualConfirm = () => {
+    if (lastTranscriptRef.current) {
+      handleApplyVoiceW(lastTranscriptRef.current);
+    } else {
+      stopRecognition();
+      showFeedback('info', '音声入力を終了しました', undefined, 1500);
+    }
   };
 
   const handleToggleVoice = () => {
     if (isListening) {
-      stopRecognition();
-      showFeedback('info', '音声入力を停止しました', undefined, 1500);
+      handleManualConfirm();
       return;
     }
 
@@ -185,23 +200,56 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     try {
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = 'ja-JP';
-      recognition.continuous = false; // 単発発話で確定
-      recognition.interimResults = false;
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      lastTranscriptRef.current = '';
 
       recognition.onstart = () => {
         setIsListening(true);
         isListeningRef.current = true;
-        const countText = items.length === 1 ? '例:「0.3」「全般」' : '例:「0.3と0.5」「両方50」';
-        showFeedback('info', '🎙️ W数値を話してください...', countText, 0);
+        const hintText =
+          items.length === 1
+            ? '例:「0.3 確定」「全般 以上」'
+            : '例:「0.3と0.5 確定」「0.3 0.5 完了」';
+        showFeedback('info', '🎙️ 音声入力中...', hintText, 0, true);
       };
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
+        let interimTranscript = '';
+        let finalTranscript = '';
+
         for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
+          } else {
+            interimTranscript += result[0].transcript;
+          }
         }
-        if (transcript.trim()) {
-          handleApplyVoiceW(transcript.trim());
+
+        const combined = (finalTranscript + interimTranscript).trim();
+        if (combined) {
+          lastTranscriptRef.current = combined;
+          setInterimText(combined);
+
+          const damageCount = items.length;
+          const parseResult = parseVoiceDamageW(combined, damageCount);
+
+          // ポップアップを更新して認識中のテキストを可視化
+          showFeedback(
+            'info',
+            `🎙️ 『${combined}』`,
+            parseResult.success
+              ? `【認識】${parseResult.feedbackText} （「確定」または「以上」で終了）`
+              : '「確定」「以上」で終了します',
+            0,
+            true
+          );
+
+          // 終了合図（「確定」「以上」「決定」「完了」「ストップ」など）が発話されたら即時確定・停止！
+          if (parseResult.hasEndCommand) {
+            handleApplyVoiceW(combined);
+          }
         }
       };
 
@@ -216,7 +264,16 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       };
 
       recognition.onend = () => {
-        stopRecognition();
+        // もし終了キーなどで自発的に止めておらず、かつ何か喋っていた場合
+        if (isListeningRef.current) {
+          if (lastTranscriptRef.current) {
+            handleApplyVoiceW(lastTranscriptRef.current);
+          } else {
+            stopRecognition();
+          }
+        } else {
+          stopRecognition();
+        }
       };
 
       recognitionRef.current = recognition;
@@ -266,7 +323,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
         ) : (
           <Mic size={14} />
         )}
-        <span>W音声</span>
+        <span>{isListening ? '確定/停止' : 'W音声'}</span>
       </button>
 
       {/* ポップオーバー / ツールチップ通知 */}
@@ -294,38 +351,67 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
                   : feedback.type === 'error'
                     ? '#991b1b'
                     : '#1e293b',
-            border: `1.5px solid ${
-              feedback.type === 'success'
+            border: `1.5px solid ${feedback.type === 'success'
                 ? '#a7f3d0'
                 : feedback.type === 'warning'
                   ? '#fde68a'
                   : feedback.type === 'error'
                     ? '#fecaca'
                     : '#cbd5e1'
-            }`,
+              }`,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             borderRadius: '8px',
-            padding: '6px 10px',
-            minWidth: '200px',
-            maxWidth: '280px',
+            padding: '8px 10px',
+            minWidth: '220px',
+            maxWidth: '300px',
             display: 'flex',
             flexDirection: 'column',
-            gap: '2px',
+            gap: '4px',
             fontSize: '0.78rem',
             animation: 'fadeInSlideDown 0.2s ease',
             pointerEvents: 'auto',
           }}
-          onClick={() => setFeedback(null)}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' }}>
-            {feedback.type === 'success' && <Check size={14} color="#10b981" />}
-            {feedback.type === 'warning' && <AlertCircle size={14} color="#f59e0b" />}
-            {feedback.type === 'error' && <AlertCircle size={14} color="#ef4444" />}
-            {feedback.type === 'info' && <Mic size={14} color="#6366f1" />}
-            <span>{feedback.text}</span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold', minWidth: 0 }}>
+              {feedback.type === 'success' && <Check size={14} color="#10b981" />}
+              {feedback.type === 'warning' && <AlertCircle size={14} color="#f59e0b" />}
+              {feedback.type === 'error' && <AlertCircle size={14} color="#ef4444" />}
+              {feedback.type === 'info' && <Mic size={14} color="#6366f1" className={isListening ? 'voice-listening-pulse-icon' : ''} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {feedback.text}
+              </span>
+            </div>
+
+            {/* 音声入力中の即時確定ボタン */}
+            {isListening && feedback.canManualConfirm && (
+              <button
+                type="button"
+                onClick={handleManualConfirm}
+                style={{
+                  backgroundColor: '#4f46e5',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '2px 6px',
+                  fontSize: '0.72rem',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '2px',
+                  flexShrink: 0,
+                }}
+                title="即時確定して入力を完了"
+              >
+                <Check size={12} />
+                <span>確定</span>
+              </button>
+            )}
           </div>
+
           {feedback.subText && (
-            <span style={{ fontSize: '0.72rem', opacity: 0.85, paddingLeft: '19px' }}>
+            <span style={{ fontSize: '0.72rem', opacity: 0.9, paddingLeft: '19px', wordBreak: 'break-word' }}>
               {feedback.subText}
             </span>
           )}
@@ -334,3 +420,4 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     </div>
   );
 };
+

@@ -24,6 +24,7 @@ export interface DamageItem {
   valueW: number; // 数値W (W寸法, 0 = 入力なし)
   valueL: number; // 数値L (L寸法, 0 = 入力なし)
   preset?: '全般' | '多数' | null; // 全般 / 多数 選択肢
+  isLessThan?: boolean; // 「以下」フラグ (<〇〇)
   value?: number; // 互換性用
 }
 

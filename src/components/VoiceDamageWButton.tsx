@@ -132,6 +132,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
           ...newItems[idx],
           valueW: parsed.valueW,
           preset: parsed.preset,
+          isLessThan: parsed.isLessThan,
         };
       }
     });

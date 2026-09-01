@@ -206,6 +206,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
+  // 損傷の「以下(<)」トグル切り替え
+  const handleDamageLessThanToggle = (index: number) => {
+    const current = [...(selection.damages || [])];
+    if (!current[index]) return;
+
+    const nextLessThan = !current[index].isLessThan;
+    current[index] = { ...current[index], isLessThan: nextLessThan };
+
+    onChangeSelection({
+      ...selection,
+      damages: current,
+      situationButton: null,
+    });
+  };
+
   // 損傷の50設定
   const handleDamage50Set = (index: number) => {
     const current = [...(selection.damages || [])];
@@ -435,6 +450,17 @@ export const MainArea: React.FC<MainAreaProps> = ({
       list.push(item);
     }
     item.valueL = Math.max(0, parseFloat(rawVal) || 0);
+    updateCustomDamages(list);
+  };
+
+  const handleCustomDamageLessThanToggle = (btnName: string) => {
+    const list = [...currentCustomDamages];
+    let item = list.find((d) => d.name === btnName);
+    if (!item) {
+      item = { name: btnName, valueW: 0, valueL: 0 };
+      list.push(item);
+    }
+    item.isLessThan = !item.isLessThan;
     updateCustomDamages(list);
   };
 
@@ -691,15 +717,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 }}
               >
                 <span
-                  className={`category-badge ${
-                    item.category === '場所'
-                      ? 'category-location'
-                      : item.category === '階数'
-                        ? 'category-floor'
-                        : item.category === '部位'
-                          ? 'category-part'
-                          : 'category-damage'
-                  }`}
+                  className={`category-badge ${item.category === '場所'
+                    ? 'category-location'
+                    : item.category === '階数'
+                      ? 'category-floor'
+                      : item.category === '部位'
+                        ? 'category-part'
+                        : 'category-damage'
+                    }`}
                   style={{ fontSize: '0.62rem', padding: '0 4px' }}
                 >
                   {item.category}
@@ -1140,6 +1165,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
                             }}
                           >
                             上下
+                          </button>
+                          <button
+                            type="button"
+                            className={`btn ${item.isLessThan ? 'selected' : ''}`}
+                            onClick={() => handleCustomDamageLessThanToggle(btnName)}
+                            style={{
+                              padding: '2px 8px',
+                              fontSize: '0.8rem',
+                              height: '26px',
+                              fontWeight: 'bold',
+                            }}
+                            title="以下 (＜) を指定"
+                          >
+                            &lt;
                           </button>
                           <button
                             type="button"
@@ -2088,6 +2127,15 @@ export const MainArea: React.FC<MainAreaProps> = ({
                           }}
                         >
                           上下
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
+                          onClick={() => handleDamageLessThanToggle(idx)}
+                          style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
+                          title="以下 (＜) を指定"
+                        >
+                          &lt;
                         </button>
                         <button
                           type="button"

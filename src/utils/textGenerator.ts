@@ -123,11 +123,12 @@ export function getLineComponents(
       } else {
         const wVal = dmgInfo.valueW ?? 0;
         const lVal = dmgInfo.valueL ?? 0;
+        const wPrefix = dmgInfo.isLessThan ? '<' : '';
         let valStr = '';
         if (wVal > 0 && lVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+          valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
         } else if (wVal > 0) {
-          valStr = `W${formatDamageValue(wVal)}`;
+          valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
         } else if (lVal > 0) {
           valStr = `L${formatDamageValue(lVal)}`;
         }
@@ -195,11 +196,12 @@ export function getLineComponents(
         } else {
           const wVal = d.valueW ?? d.value ?? 0;
           const lVal = d.valueL ?? 0;
+          const wPrefix = d.isLessThan ? '<' : '';
           let valStr = '';
           if (wVal > 0 && lVal > 0) {
-            valStr = `W${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+            valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
           } else if (wVal > 0) {
-            valStr = `W${formatDamageValue(wVal)}`;
+            valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
           } else if (lVal > 0) {
             valStr = `L${formatDamageValue(lVal)}`;
           }
@@ -246,11 +248,12 @@ export function formatDamageValueDetail(item: DamageItem): string {
   }
   const wVal = item.valueW ?? item.value ?? 0;
   const lVal = item.valueL ?? 0;
+  const wPrefix = item.isLessThan ? '<' : '';
 
   if (wVal > 0 && lVal > 0) {
-    return `W=${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
+    return `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
   } else if (wVal > 0) {
-    return `W=${formatDamageValue(wVal)}mm`;
+    return `W=${wPrefix}${formatDamageValue(wVal)}mm`;
   } else if (lVal > 0) {
     return `L=${formatDamageValue(lVal)}mm`;
   }

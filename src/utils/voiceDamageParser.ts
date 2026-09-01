@@ -5,6 +5,7 @@
 export interface ParsedDamageW {
   valueW: number;
   preset: '全般' | '多数' | null;
+  isLessThan?: boolean;
 }
 
 export interface VoiceDamageParseResult {
@@ -66,30 +67,32 @@ export function normalizeJapaneseNumbers(text: string): string {
 }
 
 /**
- * 1つの文字列セグメントから Damage W 情報（valueW または preset）をパースする
+ * 1つの文字列セグメントから Damage W 情報（valueW または preset、および isLessThan）をパースする
  */
 function parseSingleDamageItem(segment: string): ParsedDamageW | null {
   const cleaned = segment.trim();
   if (!cleaned) return null;
 
+  const isLessThan = /(?:以下|いか|未満|みまん|<|＜)/i.test(cleaned);
+
   // 1. クリア / ゼロ / なし
   if (/^(?:クリア|リセット|ゼロ|なし|消去|0)$/i.test(cleaned)) {
-    return { valueW: 0, preset: null };
+    return { valueW: 0, preset: null, isLessThan: false };
   }
 
   // 2. プリセット: 全般
   if (/全般|ぜんぱん/i.test(cleaned)) {
-    return { valueW: 0, preset: '全般' };
+    return { valueW: 0, preset: '全般', isLessThan: false };
   }
 
   // 3. プリセット: 多数
   if (/多数|たすう/i.test(cleaned)) {
-    return { valueW: 0, preset: '多数' };
+    return { valueW: 0, preset: '多数', isLessThan: false };
   }
 
   // 4. 50
   if (/\b50\b|50/.test(cleaned)) {
-    return { valueW: 50, preset: null };
+    return { valueW: 50, preset: null, isLessThan: false };
   }
 
   // 5. 数値（小数含む）の抽出 (例: 0.3, 1.5, 2, 0.25 など)
@@ -97,7 +100,7 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
   if (numMatch) {
     const val = parseFloat(numMatch[0]);
     if (!isNaN(val)) {
-      return { valueW: val, preset: null };
+      return { valueW: val, preset: null, isLessThan };
     }
   }
 
@@ -228,7 +231,7 @@ export function parseVoiceDamageW(
     success: false,
     damages: [],
     rawText: rawTranscript,
-    feedbackText: `認識できませんでした（発話:「${rawTranscript}」）。「0.3」や「0.3と0.5」のように話してください。`,
+    feedbackText: `認識できませんでした（発話:「${rawTranscript}」）。「0.3」や「以下1.0」「0.3と0.5」のように話してください。`,
     hasEndCommand,
   };
 }
@@ -237,16 +240,17 @@ export function parseVoiceDamageW(
  * 認識結果の確認用テキストを生成
  */
 function formatFeedbackText(items: ParsedDamageW[]): string {
+  const formatItem = (item: ParsedDamageW) => {
+    if (item.preset) return `【${item.preset}】`;
+    const prefix = item.isLessThan ? '<' : '';
+    return `W = ${prefix}${item.valueW}`;
+  };
+
   if (items.length === 1) {
-    const item = items[0];
-    const desc = item.preset ? `【${item.preset}】` : `W = ${item.valueW}`;
-    return `損傷1: ${desc}`;
+    return `損傷1: ${formatItem(items[0])}`;
   }
   return items
-    .map((item, idx) => {
-      const desc = item.preset ? `【${item.preset}】` : `W = ${item.valueW}`;
-      return `損傷${idx + 1}: ${desc}`;
-    })
+    .map((item, idx) => `損傷${idx + 1}: ${formatItem(item)}`)
     .join(' / ');
 }
 

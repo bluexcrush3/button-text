@@ -146,6 +146,10 @@ export function parseVoiceDamageW(
   text = text.replace(/数値|すうち|あたい|値|寸法/gi, ' ');
   text = text.replace(/です|ます|登録|設定|入力|お願い|にして|で/gi, ' ');
 
+  // 「以下 1.0」や「1.0 以下」のように数値とキーワードの間にスペースがある場合、結合して分離を防止
+  text = text.replace(/(以下|いか|未満|みまん|<|＜)\s+(\d)/gi, '$1$2');
+  text = text.replace(/(\d+)\s+(以下|いか|未満|みまん|<|＜)/gi, '$1$2');
+
   text = text.trim();
 
   // 1. 特殊ケース: 「両方 〇〇」「同じく 〇〇」「共に 〇〇」
@@ -206,12 +210,14 @@ export function parseVoiceDamageW(
 
   // 4. もし分割で取れなかった場合、テキスト全体から数値を順番にすべて抽出
   if (parsedItems.length === 0) {
+    const hasGlobalLessThan = /(?:以下|いか|未満|みまん|<|＜)/i.test(text);
     const allNums = text.match(/\b\d+(?:\.\d+)?\b/g);
     if (allNums && allNums.length > 0) {
       for (let i = 0; i < Math.min(allNums.length, damageCount); i++) {
         parsedItems.push({
           valueW: parseFloat(allNums[i]),
           preset: null,
+          isLessThan: hasGlobalLessThan,
         });
       }
     }

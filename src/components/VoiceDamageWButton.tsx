@@ -62,6 +62,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     }
     setIsListening(false);
     setInterimText('');
+    lastTranscriptRef.current = '';
   };
 
   useEffect(() => {
@@ -185,6 +186,16 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       return;
     }
 
+    // すでに認識インスタンスが残っている場合は強制破棄
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+
     const win = window as unknown as IWindow;
     const SpeechRecognitionAPI = win.SpeechRecognition || win.webkitSpeechRecognition;
 
@@ -200,13 +211,15 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     try {
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = 'ja-JP';
-      recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.continuous = false; // 各セッションごとに単発で完全に新しく認識（過去テキスト混在防止）
+      recognition.interimResults = true; // リアルタイム認識とキーワード即時確定を有効化
       lastTranscriptRef.current = '';
+      setInterimText('');
 
       recognition.onstart = () => {
         setIsListening(true);
         isListeningRef.current = true;
+        lastTranscriptRef.current = '';
         const hintText =
           items.length === 1
             ? '例:「0.3 確定」「全般 以上」'
@@ -215,6 +228,8 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       };
 
       recognition.onresult = (event: any) => {
+        if (!isListeningRef.current) return;
+
         let interimTranscript = '';
         let finalTranscript = '';
 
@@ -235,7 +250,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
           const damageCount = items.length;
           const parseResult = parseVoiceDamageW(combined, damageCount);
 
-          // ポップアップを更新して認識中のテキストを可視化
+          // ポップアップを更新して認識中のテキストをリアルタイム可視化
           showFeedback(
             'info',
             `🎙️ 『${combined}』`,
@@ -264,10 +279,12 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       };
 
       recognition.onend = () => {
-        // もし終了キーなどで自発的に止めておらず、かつ何か喋っていた場合
+        // 自然に無音などで音声認識が終了した場合
         if (isListeningRef.current) {
-          if (lastTranscriptRef.current) {
-            handleApplyVoiceW(lastTranscriptRef.current);
+          const textToApply = lastTranscriptRef.current;
+          isListeningRef.current = false;
+          if (textToApply) {
+            handleApplyVoiceW(textToApply);
           } else {
             stopRecognition();
           }
@@ -352,12 +369,12 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
                     ? '#991b1b'
                     : '#1e293b',
             border: `1.5px solid ${feedback.type === 'success'
-                ? '#a7f3d0'
-                : feedback.type === 'warning'
-                  ? '#fde68a'
-                  : feedback.type === 'error'
-                    ? '#fecaca'
-                    : '#cbd5e1'
+              ? '#a7f3d0'
+              : feedback.type === 'warning'
+                ? '#fde68a'
+                : feedback.type === 'error'
+                  ? '#fecaca'
+                  : '#cbd5e1'
               }`,
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             borderRadius: '8px',

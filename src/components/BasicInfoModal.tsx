@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BasicInfo, SurveyType, INVESTIGATOR_OPTIONS } from '../types';
 import { Settings, Plus, Minus, Check, X } from 'lucide-react';
 
@@ -16,6 +16,12 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
   onSave,
 }) => {
   const [formData, setFormData] = useState<BasicInfo>(basicInfo);
+
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(basicInfo);
+    }
+  }, [isOpen, basicInfo]);
 
   if (!isOpen) return null;
 

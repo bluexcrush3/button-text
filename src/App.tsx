@@ -270,7 +270,7 @@ export const App: React.FC = () => {
       newBasicInfo = {
         houseNumber: maxHouseNum + 1,
         surveyType: '外部',
-        investigator: '山本',
+        investigator: activeTab?.basicInfo.investigator || '山本',
         folderNumber: 100,
       };
     }
@@ -520,6 +520,7 @@ export const App: React.FC = () => {
       {/* モーダル: 基本情報 */}
       {activeTab && (
         <BasicInfoModal
+          key={activeTab.id}
           isOpen={isBasicInfoOpen}
           onClose={() => setIsBasicInfoOpen(false)}
           basicInfo={activeTab.basicInfo}

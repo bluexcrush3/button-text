@@ -1,9 +1,10 @@
 import React from 'react';
-import { TabData, CustomButtonConfig, LineSelection } from '../types';
+import { TabData, LineSelection } from '../types';
 import { getTabName } from '../utils/tabUtils';
-import { generateLineText } from '../utils/textGenerator';
+import { generateLineText, CustomButtonsInput } from '../utils/textGenerator';
 import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy, X } from 'lucide-react';
 import { VoiceDamageWButton } from './VoiceDamageWButton';
+import { VoiceInclinationButton } from './VoiceInclinationButton';
 
 interface HeaderProps {
   tabs: TabData[];
@@ -20,7 +21,7 @@ interface HeaderProps {
   onDeleteLine: () => void;
   canPrev: boolean;
   canCopyPrev: boolean;
-  customButtons?: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] };
+  customButtons?: CustomButtonsInput;
   currentSelection?: LineSelection;
   onChangeSelection?: (newSelection: LineSelection) => void;
 }
@@ -51,6 +52,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const totalLines = activeTab?.lines.length || 1;
   const currentLineNum = (activeTab?.currentLineIndex || 0) + 1;
+  const currentMode = currentSelection?.mode || activeTab?.basicInfo.surveyType || '外部';
 
   return (
     <header className="sticky-header">
@@ -151,12 +153,19 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-            {/* 一括W音声入力ボタン（「＋」ボタンの左隣り） */}
+            {/* 一括音声入力ボタン（傾斜モードなら傾音声、それ以外はW音声） */}
             {currentSelection && onChangeSelection && (
-              <VoiceDamageWButton
-                selection={currentSelection}
-                onChangeSelection={onChangeSelection}
-              />
+              currentMode === '傾斜' ? (
+                <VoiceInclinationButton
+                  selection={currentSelection}
+                  onChangeSelection={onChangeSelection}
+                />
+              ) : (
+                <VoiceDamageWButton
+                  selection={currentSelection}
+                  onChangeSelection={onChangeSelection}
+                />
+              )
             )}
 
             {/* 「＋」行挿入ボタン */}

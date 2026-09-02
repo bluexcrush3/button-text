@@ -23,11 +23,11 @@ export function formatDirections(dirs: string[]): string {
  * 数値をフォーマット (1 -> 1.0, 1.5 -> 1.5)
  */
 export function formatDamageValue(val: number): string {
-  if (val <= 0) return '';
-  if (Number.isInteger(val)) {
-    return `${val}.0`;
-  }
-  return `${val}`;
+  if (val === 0 || isNaN(val)) return '';
+  const isNeg = val < 0;
+  const abs = Math.abs(val);
+  const formatted = Number.isInteger(abs) ? `${abs}.0` : `${abs}`;
+  return isNeg ? `-${formatted}` : formatted;
 }
 
 /**
@@ -64,18 +64,43 @@ export interface LineComponents {
   situation: string;
 }
 
+export type CustomButtonsInput =
+  | CustomButtonConfig[]
+  | {
+      internal?: CustomButtonConfig[];
+      external?: CustomButtonConfig[];
+      inclination?: CustomButtonConfig[];
+    };
+
 export function getLineComponents(
   selection: LineSelection,
-  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = []
+  customButtonsInput: CustomButtonsInput = []
 ): LineComponents {
   let customButtons: CustomButtonConfig[] = [];
   if (Array.isArray(customButtonsInput)) {
     customButtons = customButtonsInput;
   } else if (customButtonsInput && typeof customButtonsInput === 'object') {
-    customButtons = selection.mode === '内部' ? (customButtonsInput.internal || []) : (customButtonsInput.external || []);
+    if (selection.mode === '内部') {
+      customButtons = customButtonsInput.internal || [];
+    } else if (selection.mode === '傾斜') {
+      const incBtns = customButtonsInput.inclination || [];
+      const locationBtns: CustomButtonConfig[] = [];
+      const seenNames = new Set(incBtns.map((b) => b.name));
+
+      [...(customButtonsInput.internal || []), ...(customButtonsInput.external || [])].forEach((b) => {
+        if (b.category === '場所' && !seenNames.has(b.name)) {
+          seenNames.add(b.name);
+          locationBtns.push(b);
+        }
+      });
+      customButtons = [...incBtns, ...locationBtns];
+    } else {
+      customButtons = customButtonsInput.external || [];
+    }
   }
 
   const isInternal = selection.mode === '内部';
+  const isInclination = selection.mode === '傾斜';
 
   const direction = formatDirections(selection.directions || []);
 
@@ -88,11 +113,15 @@ export function getLineComponents(
 
   const selectedBtnNames = isInternal
     ? (selection.internalSelections || [])
-    : (selection.externalSelections || []);
+    : isInclination
+      ? (selection.inclinationSelections || [])
+      : (selection.externalSelections || []);
 
   const selectedDamages = isInternal
     ? (selection.internalDamages || [])
-    : (selection.externalDamages || []);
+    : isInclination
+      ? (selection.inclinationValues || selection.damages || [])
+      : (selection.externalDamages || []);
 
   const locationNames: string[] = [];
   const floorNames: string[] = [];
@@ -103,7 +132,7 @@ export function getLineComponents(
   selectedBtnNames.forEach((btnName) => {
     const baseName = btnName.replace(/[①-⑳]/g, '');
     const btnConfig = customButtons.find((b) => b.name === btnName || b.name === baseName);
-    const cat = btnConfig?.category || '損傷';
+    const cat = btnConfig?.category || '部位';
 
     if (cat === '場所') {
       locationNames.push(btnName);
@@ -151,6 +180,40 @@ export function getLineComponents(
         customDamageStrings.push(vItem.text);
       }
     });
+  }
+
+  if (isInclination) {
+    const buildingStr = selection.location?.isBuilding ? '建物' : '';
+    const location = [buildingStr, ...locationNames].filter(Boolean).join('');
+
+    const { floor1, floor2 } = selection.location || {};
+    const stepperFloor = formatFloor(floor1, floor2);
+    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
+
+    const part = [selection.part, ...partNames].filter(Boolean).join('');
+
+    // 傾斜モードの数値リスト（inclinationValues）
+    const inclinationValuesList = (selection.inclinationValues && selection.inclinationValues.length > 0)
+      ? selection.inclinationValues
+      : (selection.damages || []);
+
+    const inclinationValueStrings: string[] = [];
+    inclinationValuesList.forEach((item) => {
+      const valStr = formatDamageValueDetail(item, true);
+      if (valStr) {
+        inclinationValueStrings.push(valStr);
+      }
+    });
+
+    return {
+      location,
+      floor,
+      direction,
+      part,
+      damages: inclinationValueStrings,
+      damageItems: inclinationValuesList,
+      situation,
+    };
   }
 
   if (isInternal) {
@@ -240,15 +303,22 @@ export function parseDamageName(name: string): { prefix: string; baseName: strin
 }
 
 /**
- * ダメージ項目の数値/プリセット部分をフォーマット (例: W=1.0mm　L=2.0mm)
+ * ダメージ項目の数値/プリセット部分をフォーマット (例: W=1.0mm　L=2.0mm、傾斜モード時は 2.5)
  */
-export function formatDamageValueDetail(item: DamageItem): string {
+export function formatDamageValueDetail(item: DamageItem, isInclination: boolean = false): string {
   if (item.preset) {
     return item.preset;
   }
   const wVal = item.valueW ?? item.value ?? 0;
   const lVal = item.valueL ?? 0;
   const wPrefix = item.isLessThan ? '<' : '';
+
+  if (isInclination) {
+    if (wVal !== 0) {
+      return `${wPrefix}${formatDamageValue(wVal)}`;
+    }
+    return '';
+  }
 
   if (wVal > 0 && lVal > 0) {
     return `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
@@ -262,26 +332,21 @@ export function formatDamageValueDetail(item: DamageItem): string {
 
 /**
  * クリップボード（スプレッドシート貼付）用フォーマット（全6列タブ区切り）
- * ① "場所"あり / 損傷1つ
- * ② "場所"あり / 損傷異なる2つ
- * ③ "場所"あり / 損傷同名2つ
- * ④ "場所"なし / 損傷1つ
- * ⑤ "場所"なし / 損傷異なる2つ
- * ⑥ "場所"なし / 損傷同名2つ
  */
 export function generateLineTextForSpreadsheet(
   selection: LineSelection,
-  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = []
+  customButtonsInput: CustomButtonsInput = []
 ): string {
   const comp = getLineComponents(selection, customButtonsInput);
 
+  const isInclination = selection.mode === '傾斜';
   const hasLocation = Boolean(comp.location && comp.location.trim().length > 0);
   const locationAndFloor = [comp.location, comp.floor].filter(Boolean).join('　');
 
   const direction = comp.direction;
   const part = comp.part;
 
-  // 現況・全景ボタンは損傷と同じ扱いとして第3列に結合
+  // 現況・全景ボタン
   const sitBtn = selection.situationButton || null; // '全景' | '現況' | null
 
   // 第6列は自由入力テキストのみ
@@ -295,6 +360,30 @@ export function generateLineTextForSpreadsheet(
   let col3 = '';
   let col4 = '';
   let col5 = '';
+
+  if (isInclination) {
+    // 傾斜モードの列振り分け
+    if (hasLocation) {
+      col1 = locationAndFloor;
+      col3 = [part, sitBtn].filter(Boolean).join('　');
+    } else {
+      col1 = part;
+      col3 = sitBtn || '';
+    }
+
+    const val1 = items[0] ? formatDamageValueDetail(items[0], true) : '';
+    const val2 = items[1] ? formatDamageValueDetail(items[1], true) : '';
+
+    col4 = val1;
+    col5 = val2;
+
+    if (!col4 && col5) {
+      col4 = col5;
+      col5 = '';
+    }
+
+    return `${col1}\t${col2}\t${col3}\t${col4}\t${col5}\t${col6}`;
+  }
 
   if (count === 0) {
     const damagePartText = sitBtn || '';
@@ -386,7 +475,7 @@ export function generateLineTextForSpreadsheet(
 
 export function generateLineText(
   selection: LineSelection,
-  customButtonsInput: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] } = [],
+  customButtonsInput: CustomButtonsInput = [],
   delimiter: string = ' / '
 ): string {
   if (delimiter === '\t') {
@@ -399,4 +488,5 @@ export function generateLineText(
     .filter((t) => t.trim().length > 0)
     .join(' / ');
 }
+
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
 import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic } from 'lucide-react';
 import { VoiceInputModal } from './VoiceInputModal';
@@ -10,8 +10,10 @@ interface MainAreaProps {
   onClearCurrentLine: () => void;
   internalCustomButtons: CustomButtonConfig[];
   externalCustomButtons: CustomButtonConfig[];
+  inclinationCustomButtons: CustomButtonConfig[];
   onChangeInternalCustomButtons: (newButtons: CustomButtonConfig[]) => void;
   onChangeExternalCustomButtons: (newButtons: CustomButtonConfig[]) => void;
+  onChangeInclinationCustomButtons: (newButtons: CustomButtonConfig[]) => void;
 }
 
 export const MainArea: React.FC<MainAreaProps> = ({
@@ -21,8 +23,10 @@ export const MainArea: React.FC<MainAreaProps> = ({
   onClearCurrentLine,
   internalCustomButtons,
   externalCustomButtons,
+  inclinationCustomButtons,
   onChangeInternalCustomButtons,
   onChangeExternalCustomButtons,
+  onChangeInclinationCustomButtons,
 }) => {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const isLocationDisabled = selection.part === '塀' || selection.part === '土間';
@@ -263,21 +267,114 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
   const currentMode = selection.mode || '外部';
   const isModeInternal = currentMode === '内部';
+  const isModeInclination = currentMode === '傾斜';
 
-  const customButtons = isModeInternal ? internalCustomButtons : externalCustomButtons;
-  const onChangeCustomButtons = isModeInternal ? onChangeInternalCustomButtons : onChangeExternalCustomButtons;
+  const customButtons = isModeInternal
+    ? internalCustomButtons
+    : isModeInclination
+      ? inclinationCustomButtons
+      : externalCustomButtons;
+
+  const onChangeCustomButtons = isModeInternal
+    ? onChangeInternalCustomButtons
+    : isModeInclination
+      ? onChangeInclinationCustomButtons
+      : onChangeExternalCustomButtons;
+
+  // 傾斜モード表示用: 傾斜カスタムボタン + 外部/内部の「場所」カテゴリボタン（重複排除）
+  const displayedCustomButtons = useMemo(() => {
+    if (isModeInternal) return internalCustomButtons;
+    if (isModeInclination) {
+      const incBtns = inclinationCustomButtons || [];
+      const locationBtns: CustomButtonConfig[] = [];
+      const seenNames = new Set(incBtns.map((b) => b.name));
+
+      [...(internalCustomButtons || []), ...(externalCustomButtons || [])].forEach((b) => {
+        if (b.category === '場所' && !seenNames.has(b.name)) {
+          seenNames.add(b.name);
+          locationBtns.push(b);
+        }
+      });
+      return [...incBtns, ...locationBtns];
+    }
+    return externalCustomButtons;
+  }, [isModeInternal, isModeInclination, internalCustomButtons, externalCustomButtons, inclinationCustomButtons]);
 
   const currentCustomSelections = isModeInternal
     ? (selection.internalSelections || [])
-    : (selection.externalSelections || []);
+    : isModeInclination
+      ? (selection.inclinationSelections || [])
+      : (selection.externalSelections || []);
 
   const currentCustomDamages = isModeInternal
     ? (selection.internalDamages || [])
-    : (selection.externalDamages || []);
+    : isModeInclination
+      ? (selection.inclinationValues || [])
+      : (selection.externalDamages || []);
 
-  // 内部/外部用ハンドラーとローカルステート
+  // 傾斜数値操作用
+  const currentInclinationValues = selection.inclinationValues || [];
+
+  const updateInclinationValues = (newValues: DamageItem[]) => {
+    onChangeSelection({
+      ...selection,
+      inclinationValues: newValues,
+    });
+  };
+
+  const handleInclinationValueChange = (index: number, delta: number) => {
+    const list = [...currentInclinationValues];
+    while (list.length <= index) {
+      list.push({ name: `傾斜${list.length + 1}`, valueW: 0, valueL: 0 });
+    }
+    const curVal = list[index].valueW || 0;
+    list[index] = {
+      ...list[index],
+      valueW: parseFloat((curVal + delta).toFixed(1)),
+    };
+    updateInclinationValues(list);
+  };
+
+  const handleInclinationValueInput = (index: number, rawVal: string) => {
+    const list = [...currentInclinationValues];
+    while (list.length <= index) {
+      list.push({ name: `傾斜${list.length + 1}`, valueW: 0, valueL: 0 });
+    }
+    const parsed = parseFloat(rawVal) || 0;
+    list[index] = {
+      ...list[index],
+      valueW: parsed,
+    };
+    updateInclinationValues(list);
+  };
+
+  const handleInclinationMinusToggle = (index: number) => {
+    const list = [...currentInclinationValues];
+    while (list.length <= index) {
+      list.push({ name: `傾斜${list.length + 1}`, valueW: 0, valueL: 0 });
+    }
+    const curVal = list[index].valueW || 0;
+    if (curVal === 0) {
+      list[index] = {
+        ...list[index],
+        valueW: -1.0,
+      };
+    } else {
+      list[index] = {
+        ...list[index],
+        valueW: parseFloat((-curVal).toFixed(1)),
+      };
+    }
+    updateInclinationValues(list);
+  };
+
+  const handleClearInclinationValues = () => {
+    updateInclinationValues([]);
+  };
+
+  // 内部/外部/傾斜用ハンドラーとローカルステート
   const [newButtonName, setNewButtonName] = useState('');
-  const [newButtonCategory, setNewButtonCategory] = useState<CustomButtonCategory>('損傷');
+  const [newButtonCategory, setNewButtonCategory] = useState<CustomButtonCategory>('部位');
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [locationModalBtn, setLocationModalBtn] = useState<CustomButtonConfig | null>(null);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -306,7 +403,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handleToggleCustomSelection = (btnName: string) => {
-    const btnConfig = customButtons.find((b) => b.name === btnName);
+    const btnConfig = displayedCustomButtons.find((b) => b.name === btnName);
     if (btnConfig?.isVoice || btnName === '音声入力') {
       setIsVoiceModalOpen(true);
       return;
@@ -343,6 +440,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
         ...selection,
         internalSelections: nextSelections,
         internalDamages: nextDamages,
+      });
+    } else if (isModeInclination) {
+      onChangeSelection({
+        ...selection,
+        inclinationSelections: nextSelections,
       });
     } else {
       onChangeSelection({
@@ -381,6 +483,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
       onChangeSelection({
         ...selection,
         internalSelections: next,
+      });
+    } else if (isModeInclination) {
+      onChangeSelection({
+        ...selection,
+        inclinationSelections: next,
       });
     } else {
       onChangeSelection({
@@ -426,7 +533,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
       item = { name: btnName, valueW: 0, valueL: 0 };
       list.push(item);
     }
-    item.valueW = Math.max(0, parseFloat(rawVal) || 0);
+    const parsed = Math.max(0, parseFloat(rawVal) || 0);
+    item.valueW = parsed;
     updateCustomDamages(list);
   };
 
@@ -449,7 +557,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
       item = { name: btnName, valueW: 0, valueL: 0 };
       list.push(item);
     }
-    item.valueL = Math.max(0, parseFloat(rawVal) || 0);
+    const parsed = Math.max(0, parseFloat(rawVal) || 0);
+    item.valueL = parsed;
     updateCustomDamages(list);
   };
 
@@ -492,7 +601,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
     const selectedDamageButtons = currentCustomSelections
       .map((name) => {
         const baseName = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
-        return customButtons.find((b) => b.name === name || b.name === baseName);
+        return displayedCustomButtons.find((b) => b.name === name || b.name === baseName);
       })
       .filter((b): b is CustomButtonConfig => !!b && b.category === '損傷');
 
@@ -535,6 +644,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
         internalSelections: nextSelections,
         internalDamages: nextDamages,
       });
+    } else if (isModeInclination) {
+      onChangeSelection({
+        ...selection,
+        inclinationSelections: nextSelections,
+      });
     } else {
       onChangeSelection({
         ...selection,
@@ -551,8 +665,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
       alert('そのボタン名は既に登録されています。');
       return;
     }
+    const prefix = isModeInternal ? 'int' : isModeInclination ? 'inc' : 'ext';
     const newBtn: CustomButtonConfig = {
-      id: `${isModeInternal ? 'int' : 'ext'}-btn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `${prefix}-btn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       name,
       category: newButtonCategory,
     };
@@ -592,6 +707,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
           ...selection,
           internalSelections: nextSelections,
           internalDamages: nextDamages,
+        });
+      } else if (isModeInclination) {
+        onChangeSelection({
+          ...selection,
+          inclinationSelections: nextSelections,
         });
       } else {
         onChangeSelection({
@@ -648,7 +768,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>モード:</span>
           <div style={{ display: 'flex', gap: '4px' }}>
-            {(['外部', '内部'] as SurveyType[]).map((m) => {
+            {(['外部', '内部', '傾斜'] as SurveyType[]).map((m) => {
               const isSelected = currentMode === m;
               return (
                 <button
@@ -1572,6 +1692,628 @@ export const MainArea: React.FC<MainAreaProps> = ({
                                 ? 'category-part'
                                 : 'category-damage'
                             }`}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                          title="クリックして種類切り替え"
+                        >
+                          {btnConfig.category} (切替)
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, -1)}
+                          disabled={idx === 0}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="上に移動"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleMoveCustomButton(idx, 1)}
+                          disabled={idx === customButtons.length - 1}
+                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                          title="下に移動"
+                        >
+                          ▼
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
+                          style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
+                          title="削除"
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </>
+      ) : isModeInclination ? (
+        <>
+          {/* ① 傾斜用カスタムボタン選択エリア */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Box size={18} />
+                傾斜用カスタムボタン
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
+                ※場所ボタンは内外共通
+              </span>
+            </div>
+
+            {displayedCustomButtons.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: '#888', padding: '20px 0', textAlign: 'center' }}>
+                ボタンが登録されていません。下エリアから追加してください。
+              </p>
+            ) : (
+              <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                {displayedCustomButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
+                  const baseName = btnConfig.name;
+                  const isLocation = btnConfig.category === '場所';
+                  const selectedIndex = currentCustomSelections.findIndex(
+                    (item) =>
+                      item === baseName ||
+                      item.replace(/^[左右上下]/, '') === baseName ||
+                      (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
+                  );
+                  const isSelected = selectedIndex !== -1;
+                  const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
+                  const isDraggingThis = draggedIdx === idx;
+
+                  if (isVoice) {
+                    return (
+                      <button
+                        key={btnConfig.id}
+                        type="button"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
+                        onClick={() => setIsVoiceModalOpen(true)}
+                        style={{
+                          height: '52px',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          cursor: 'grab',
+                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                          borderColor: '#6366f1',
+                          borderWidth: '2px',
+                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <Mic size={16} color="#4f46e5" />
+                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
+                          タップして音声入力
+                        </span>
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <button
+                      key={btnConfig.id}
+                      type="button"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      className={`btn custom-btn-item ${isSelected ? 'selected' : ''} ${isDraggingThis ? 'dragging' : ''}`}
+                      onClick={() => handleToggleCustomSelection(baseName)}
+                      style={{
+                        height: '52px',
+                        position: 'relative',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '2px',
+                        cursor: 'grab',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{displayName}</span>
+                        <span
+                          className={`category-badge ${
+                            btnConfig.category === '場所'
+                              ? 'category-location'
+                              : btnConfig.category === '階数'
+                                ? 'category-floor'
+                                : btnConfig.category === '部位'
+                                  ? 'category-part'
+                                  : 'category-damage'
+                          }`}
+                        >
+                          {btnConfig.category}
+                        </span>
+                      </div>
+
+                      {isSelected && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            right: '4px',
+                            fontSize: '0.65rem',
+                            backgroundColor: '#ffffff',
+                            color: '#000000',
+                            borderRadius: '50%',
+                            width: '18px',
+                            height: '18px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            border: '1px solid #222222',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {selectedIndex + 1}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* ② 傾斜用 場所グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <MapPin size={18} />
+              場所グループ
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
+              {/* 建物ボタン */}
+              <button
+                type="button"
+                className={`btn ${selection.location.isBuilding ? 'selected' : ''}`}
+                onClick={handleToggleBuilding}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  padding: '0 16px',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+              >
+                建物
+              </button>
+
+              {/* 階数① */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
+                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '4px' }}>
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(-1)}
+                    style={{ width: '36px', height: '36px', flexShrink: 0 }}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    className="stepper-input"
+                    value={selection.location.floor1 || ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                      onChangeSelection({
+                        ...selection,
+                        location: { ...selection.location, floor1: val },
+                      });
+                    }}
+                    style={{ height: '36px', fontSize: '1rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(1)}
+                    style={{ width: '36px', height: '36px', flexShrink: 0 }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ③ 傾斜用 方向グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Compass size={18} />
+                方向グループ
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
+                ※最大2つ選択可
+              </span>
+            </div>
+
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+              {DIRECTION_OPTIONS.map((dir) => {
+                const isSelected = selection.directions.includes(dir);
+                return (
+                  <button
+                    key={dir}
+                    type="button"
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleDirectionToggle(dir)}
+                    style={{ height: '48px', fontSize: '1.05rem' }}
+                  >
+                    {dir}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ④ 傾斜数値入力セクション（数値1 / 数値2） */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#f0fdf4',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={18} color="#16a34a" />
+                傾斜数値入力（傾斜値）
+              </span>
+              <button
+                type="button"
+                onClick={handleClearInclinationValues}
+                style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#64748b' }}
+              >
+                数値クリア
+              </button>
+            </div>
+
+            {[0, 1].map((idx) => {
+              const item = currentInclinationValues[idx] || { name: `傾斜${idx + 1}`, valueW: 0, valueL: 0 };
+              const isNegative = (item.valueW || 0) < 0;
+              return (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '6px 8px',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '6px',
+                    border: '1px solid #bbf7d0',
+                  }}
+                >
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', minWidth: '46px', color: '#166534' }}>
+                    数値{idx + 1}:
+                  </span>
+
+                  {/* マイナス (－) 切り替えボタン */}
+                  <button
+                    type="button"
+                    className={`btn ${isNegative ? 'selected' : ''}`}
+                    onClick={() => handleInclinationMinusToggle(idx)}
+                    style={{
+                      height: '36px',
+                      width: '36px',
+                      fontSize: '1.1rem',
+                      padding: 0,
+                      fontWeight: 'bold',
+                      flexShrink: 0,
+                    }}
+                    title="マイナス符号 (－) を切り替え"
+                  >
+                    －
+                  </button>
+
+                  <div className="number-stepper" style={{ flex: 1, gap: '4px' }}>
+                    <button
+                      type="button"
+                      className="btn stepper-btn"
+                      onClick={() => handleInclinationValueChange(idx, -1.0)}
+                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold' }}
+                    >
+                      -1.0
+                    </button>
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="stepper-input"
+                      value={item.valueW !== undefined && item.valueW !== 0 ? item.valueW : (item.valueW === 0 ? '' : item.valueW)}
+                      placeholder="0"
+                      onChange={(e) => handleInclinationValueInput(idx, e.target.value)}
+                      style={{
+                        height: '36px',
+                        fontSize: '1rem',
+                        width: '90px',
+                        flexShrink: 0,
+                        textAlign: 'center',
+                        padding: '0 2px',
+                        fontWeight: 'bold',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn stepper-btn"
+                      onClick={() => handleInclinationValueChange(idx, 1.0)}
+                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold' }}
+                    >
+                      +1.0
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+
+          {/* ⑥ 傾斜用カスタムボタン管理エリア */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '12px',
+              backgroundColor: '#fafafa',
+              marginTop: '8px',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '10px' }}>
+              傾斜用カスタムボタンの追加・編集
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text"
+                  value={newButtonName}
+                  onChange={(e) => setNewButtonName(e.target.value)}
+                  placeholder="新しいボタン名..."
+                  style={{
+                    flex: 1,
+                    height: '36px',
+                    padding: '0 8px',
+                    borderRadius: '4px',
+                    border: '1px solid #ccc',
+                    fontSize: '0.9rem',
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddCustomButton();
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn selected"
+                  onClick={handleAddCustomButton}
+                  style={{ height: '36px', padding: '0 12px', fontSize: '0.85rem' }}
+                >
+                  <Plus size={16} />
+                  追加
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#555' }}>種類:</span>
+                {(['部位', '場所', '階数'] as CustomButtonCategory[]).map((cat) => (
+                  <label key={cat} style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '2px', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="newBtnCatInc"
+                      checked={newButtonCategory === cat}
+                      onChange={() => setNewButtonCategory(cat)}
+                    />
+                    {cat}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {customButtons.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '6px',
+                  maxHeight: '220px',
+                  overflowY: 'auto',
+                  border: '2px solid var(--border-color)',
+                  borderRadius: '6px',
+                  padding: '6px',
+                  backgroundColor: '#ffffff',
+                }}
+              >
+                {customButtons.map((btnConfig, idx) => {
+                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
+
+                  if (isVoice) {
+                    return (
+                      <div
+                        key={btnConfig.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, idx)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDrop(e, idx)}
+                        className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 8px',
+                          backgroundColor: '#f5f3ff',
+                          borderRadius: '4px',
+                          border: '1.5px solid #818cf8',
+                          cursor: 'grab',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <GripVertical size={16} color="#6366f1" />
+                          <Mic size={15} color="#4f46e5" />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#312e81' }}>{btnConfig.name}</span>
+                          <span
+                            className="category-badge"
+                            style={{
+                              backgroundColor: '#4f46e5',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '0.65rem',
+                              padding: '1px 5px',
+                              borderRadius: '4px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            音声 (固定)
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, -1)}
+                            disabled={idx === 0}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="上に移動"
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleMoveCustomButton(idx, 1)}
+                            disabled={idx === customButtons.length - 1}
+                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                            title="下に移動"
+                          >
+                            ▼
+                          </button>
+                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', padding: '0 4px' }}>
+                            削除不可
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={btnConfig.id}
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, idx)}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, idx)}
+                      className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '6px 8px',
+                        backgroundColor: '#f8f9fa',
+                        borderRadius: '4px',
+                        border: '1px solid #ddd',
+                        cursor: 'grab',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <GripVertical size={16} color="#888" />
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleToggleCategory(btnConfig.id)}
+                          className={`category-badge ${
+                            btnConfig.category === '場所'
+                              ? 'category-location'
+                              : btnConfig.category === '階数'
+                                ? 'category-floor'
+                                : btnConfig.category === '部位'
+                                  ? 'category-part'
+                                  : 'category-damage'
+                          }`}
                           style={{ cursor: 'pointer', border: 'none' }}
                           title="クリックして種類切り替え"
                         >

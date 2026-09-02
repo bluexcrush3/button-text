@@ -12,6 +12,7 @@ const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
 const STORAGE_KEY_CUSTOM_BUTTONS = 'btn_text_gen_custom_buttons_v5';
 const STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_internal_custom_buttons_v8';
 const STORAGE_KEY_EXTERNAL_CUSTOM_BUTTONS = 'btn_text_gen_external_custom_buttons_v3';
+const STORAGE_KEY_INCLINATION_CUSTOM_BUTTONS = 'btn_text_gen_inclination_custom_buttons_v1';
 
 export const VOICE_INPUT_INTERNAL_CONFIG: CustomButtonConfig = {
   id: 'btn-voice-internal',
@@ -27,6 +28,13 @@ export const VOICE_INPUT_EXTERNAL_CONFIG: CustomButtonConfig = {
   isVoice: true,
 };
 
+export const VOICE_INPUT_INCLINATION_CONFIG: CustomButtonConfig = {
+  id: 'inc-btn-voice-inclination',
+  name: '音声入力',
+  category: '部位',
+  isVoice: true,
+};
+
 const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
   VOICE_INPUT_INTERNAL_CONFIG,
   { id: 'btn-1', name: '和室', category: '場所' },
@@ -38,6 +46,12 @@ const DEFAULT_INTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
 const DEFAULT_EXTERNAL_CUSTOM_BUTTONS: CustomButtonConfig[] = [
   VOICE_INPUT_EXTERNAL_CONFIG,
   { id: 'ext-btn-1', name: 'グラツキ', category: '損傷' },
+];
+
+const DEFAULT_INCLINATION_CUSTOM_BUTTONS: CustomButtonConfig[] = [
+  VOICE_INPUT_INCLINATION_CONFIG,
+  { id: 'inc-btn-1', name: '柱', category: '部位' },
+  { id: 'inc-btn-2', name: '床', category: '部位' },
 ];
 
 const ensureVoiceButton = (buttons: CustomButtonConfig[], voiceConfig: CustomButtonConfig): CustomButtonConfig[] => {
@@ -65,6 +79,8 @@ const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelecti
   internalDamages: [],
   externalSelections: [],
   externalDamages: [],
+  inclinationSelections: [],
+  inclinationValues: [],
   voiceItems: [],
 });
 
@@ -81,7 +97,7 @@ const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData 
       houseNumber: 1,
       surveyType: '外部',
       investigator: '山本',
-      folderNumber: 1,
+      folderNumber: 100,
     },
     lines: [createInitialLine(defaultMode)],
     currentLineIndex: 0,
@@ -163,6 +179,21 @@ export const App: React.FC = () => {
     return DEFAULT_EXTERNAL_CUSTOM_BUTTONS;
   });
 
+  const [inclinationCustomButtons, setInclinationCustomButtons] = useState<CustomButtonConfig[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_INCLINATION_CUSTOM_BUTTONS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return ensureVoiceButton(parsed, VOICE_INPUT_INCLINATION_CONFIG);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load inclination custom buttons', e);
+    }
+    return DEFAULT_INCLINATION_CUSTOM_BUTTONS;
+  });
+
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_INTERNAL_CUSTOM_BUTTONS, JSON.stringify(internalCustomButtons));
@@ -178,6 +209,14 @@ export const App: React.FC = () => {
       console.error('Failed to save external custom buttons', e);
     }
   }, [externalCustomButtons]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_INCLINATION_CUSTOM_BUTTONS, JSON.stringify(inclinationCustomButtons));
+    } catch (e) {
+      console.error('Failed to save inclination custom buttons', e);
+    }
+  }, [inclinationCustomButtons]);
 
   // モーダル表示状態
   const [isBasicInfoOpen, setIsBasicInfoOpen] = useState(false);
@@ -213,6 +252,10 @@ export const App: React.FC = () => {
     mode: currentLine.selection.mode || activeTab?.basicInfo.surveyType || '外部',
     internalSelections: currentLine.selection.internalSelections || [],
     internalDamages: currentLine.selection.internalDamages || [],
+    externalSelections: currentLine.selection.externalSelections || [],
+    externalDamages: currentLine.selection.externalDamages || [],
+    inclinationSelections: currentLine.selection.inclinationSelections || [],
+    inclinationValues: currentLine.selection.inclinationValues || [],
   };
 
   // タブ追加
@@ -228,7 +271,7 @@ export const App: React.FC = () => {
         houseNumber: maxHouseNum + 1,
         surveyType: '外部',
         investigator: '山本',
-        folderNumber: 1,
+        folderNumber: 100,
       };
     }
 
@@ -436,7 +479,11 @@ export const App: React.FC = () => {
         onDeleteLine={handleDeleteCurrentLine}
         canPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
         canCopyPrev={activeTab ? activeTab.currentLineIndex > 0 : false}
-        customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
+        customButtons={{
+          internal: internalCustomButtons,
+          external: externalCustomButtons,
+          inclination: inclinationCustomButtons,
+        }}
         currentSelection={currentSelection}
         onChangeSelection={handleChangeSelection}
       />
@@ -451,15 +498,21 @@ export const App: React.FC = () => {
             onClearCurrentLine={handleClearCurrentLine}
             internalCustomButtons={internalCustomButtons}
             externalCustomButtons={externalCustomButtons}
+            inclinationCustomButtons={inclinationCustomButtons}
             onChangeInternalCustomButtons={setInternalCustomButtons}
             onChangeExternalCustomButtons={setExternalCustomButtons}
+            onChangeInclinationCustomButtons={setInclinationCustomButtons}
           />
           {/* TOP画面最下部: 全行プレビューエリア */}
           <AllTextPreviewPanel
             lines={activeTab.lines}
             currentLineIndex={activeTab.currentLineIndex}
             onNavigateToLine={handleNavigateToLine}
-            customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
+            customButtons={{
+              internal: internalCustomButtons,
+              external: externalCustomButtons,
+              inclination: inclinationCustomButtons,
+            }}
           />
         </>
       )}
@@ -510,7 +563,11 @@ export const App: React.FC = () => {
           houseNumber={activeTab.basicInfo.houseNumber}
           currentLineIndex={activeTab.currentLineIndex}
           onNavigateToLine={handleNavigateToLine}
-          customButtons={{ internal: internalCustomButtons, external: externalCustomButtons }}
+          customButtons={{
+            internal: internalCustomButtons,
+            external: externalCustomButtons,
+            inclination: inclinationCustomButtons,
+          }}
         />
       )}
     </>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineData, CustomButtonConfig } from '../types';
-import { generateLineText, generateLineTextForSpreadsheet } from '../utils/textGenerator';
+import { generateLineText, generateLineTextForSpreadsheet, CustomButtonsInput } from '../utils/textGenerator';
 import { FileText, Copy, Check, X } from 'lucide-react';
 
 interface AllTextModalProps {
@@ -10,7 +10,7 @@ interface AllTextModalProps {
   houseNumber: number;
   currentLineIndex?: number;
   onNavigateToLine?: (index: number) => void;
-  customButtons?: CustomButtonConfig[] | { internal: CustomButtonConfig[]; external: CustomButtonConfig[] };
+  customButtons?: CustomButtonsInput;
 }
 
 export const AllTextModal: React.FC<AllTextModalProps> = ({

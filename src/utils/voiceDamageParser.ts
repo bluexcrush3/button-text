@@ -51,6 +51,10 @@ export function normalizeJapaneseNumbers(text: string): string {
   // 単独の ".3" や ".5" を "0.3", "0.5" に補正
   s = s.replace(/(^|[^\d])\.(\d+)/g, '$1 0.$2');
 
+  // マイナスの読み ("マイナス", "まいなす", "−", "―", "ー", "‐")
+  s = s.replace(/(?:マイナス|まいなす|−|―|ー|‐)\s*(\d)/gi, '-$1');
+  s = s.replace(/(?:マイナス|まいなす)\s+/gi, '-');
+
   // 単一の漢数字/カタカナ/ひらがな数詞変換 (安全な文脈で置換)
   s = s.replace(/零|ゼロ|ぜろ/g, '0');
   s = s.replace(/一|イチ|いち/g, '1');
@@ -95,8 +99,8 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
     return { valueW: 50, preset: null, isLessThan: false };
   }
 
-  // 5. 数値（小数含む）の抽出 (例: 0.3, 1.5, 2, 0.25 など)
-  const numMatch = cleaned.match(/\b\d+(?:\.\d+)?\b/);
+  // 5. 数値（マイナス・小数含む）の抽出 (例: -1.0, 0.3, 1.5, 2, 0.25 など)
+  const numMatch = cleaned.match(/-?\d+(?:\.\d+)?/);
   if (numMatch) {
     const val = parseFloat(numMatch[0]);
     if (!isNaN(val)) {
@@ -211,7 +215,7 @@ export function parseVoiceDamageW(
   // 4. もし分割で取れなかった場合、テキスト全体から数値を順番にすべて抽出
   if (parsedItems.length === 0) {
     const hasGlobalLessThan = /(?:以下|いか|未満|みまん|<|＜)/i.test(text);
-    const allNums = text.match(/\b\d+(?:\.\d+)?\b/g);
+    const allNums = text.match(/-?\d+(?:\.\d+)?/g);
     if (allNums && allNums.length > 0) {
       for (let i = 0; i < Math.min(allNums.length, damageCount); i++) {
         parsedItems.push({

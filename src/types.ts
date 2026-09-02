@@ -54,6 +54,8 @@ export interface LineSelection {
   internalDamages?: DamageItem[]; // 内部モード用の損傷詳細情報
   externalSelections?: string[]; // 外部モード用の選択されたカスタム文字列リスト
   externalDamages?: DamageItem[]; // 外部モード用の損傷詳細情報
+  inclinationSelections?: string[]; // 傾斜モード用の選択されたカスタム文字列リスト
+  inclinationValues?: DamageItem[]; // 傾斜モード用の数値情報
   voiceItems?: VoiceInputItem[]; // 音声入力によって直接追加された文字列リスト
   mode?: SurveyType;           // この行の個別調査モード
 }
@@ -70,4 +72,18 @@ export interface TabData {
   currentLineIndex: number;
 }
 
-export const INVESTIGATOR_OPTIONS = ['山本', '佐藤', '田中', '鈴木'];
+export const INVESTIGATOR_OPTIONS = [
+  '畦地',
+  '八木',
+  '松山',
+  '安藤',
+  '西村',
+  '松本',
+  '渡辺',
+  '松本拳',
+  '高橋',
+  '井関',
+  '山本',
+  '兼松',
+  '上田',
+];

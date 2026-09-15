@@ -34,7 +34,12 @@ const loadOrderedList = (key: string, defaults: string[]): string[] => {
     if (saved) {
       const parsed: string[] = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const validItems = parsed.filter((item) => defaults.includes(item));
+        const validItems: string[] = [];
+        parsed.forEach((item) => {
+          if (typeof item === 'string' && item.trim() && !validItems.includes(item)) {
+            validItems.push(item);
+          }
+        });
         defaults.forEach((item) => {
           if (!validItems.includes(item)) validItems.push(item);
         });
@@ -134,14 +139,15 @@ export const MainArea: React.FC<MainAreaProps> = ({
   // ④ 損傷グループハンドラー（最大2つ選択）
   const handleDamageToggle = (damageName: string) => {
     const current = selection.damages || [];
+    const baseName = damageName.replace(/^[左右上下]/, '');
     const exists = current.find(
-      (d) => d.name === damageName || d.name.replace(/^[左右上下]/, '') === damageName
+      (d) => d.name === damageName || d.name.replace(/^[左右上下]/, '') === baseName
     );
 
     let next: DamageItem[];
     if (exists) {
       next = current.filter(
-        (d) => d.name !== damageName && d.name.replace(/^[左右上下]/, '') !== damageName
+        (d) => d.name !== damageName && d.name.replace(/^[左右上下]/, '') !== baseName
       );
     } else {
       const newItem: DamageItem = { name: damageName, valueW: 0, valueL: 0 };
@@ -152,13 +158,45 @@ export const MainArea: React.FC<MainAreaProps> = ({
       }
     }
 
+    const activeDamageNames = new Set(next.map((d) => d.name.replace(/^[左右上下]/, '')));
+    const nextCustomSelections = currentCustomSelections.filter((name) => {
+      const customBase = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+      const btnConfig = displayedCustomButtons.find((b) => b.name === name || b.name === customBase);
+      if (btnConfig?.category === '損傷') {
+        return activeDamageNames.has(name) || activeDamageNames.has(customBase);
+      }
+      return true;
+    });
+    const nextCustomDamages = currentCustomDamages.filter((d) =>
+      activeDamageNames.has(d.name) || activeDamageNames.has(d.name.replace(/^[左右上下]/, ''))
+    );
+
     const nextSituationButton = next.length > 0 ? null : selection.situationButton;
 
-    onChangeSelection({
-      ...selection,
-      damages: next,
-      situationButton: nextSituationButton,
-    });
+    if (isModeInternal) {
+      onChangeSelection({
+        ...selection,
+        damages: next,
+        internalSelections: nextCustomSelections,
+        internalDamages: nextCustomDamages,
+        situationButton: nextSituationButton,
+      });
+    } else if (isModeInclination) {
+      onChangeSelection({
+        ...selection,
+        damages: next,
+        inclinationSelections: nextCustomSelections,
+        situationButton: nextSituationButton,
+      });
+    } else {
+      onChangeSelection({
+        ...selection,
+        damages: next,
+        externalSelections: nextCustomSelections,
+        externalDamages: nextCustomDamages,
+        situationButton: nextSituationButton,
+      });
+    }
   };
 
   // 損傷が1つのみ選択されている時に「左右」「上下」ボタン押下で同名損傷2を追加
@@ -402,6 +440,31 @@ export const MainArea: React.FC<MainAreaProps> = ({
     updateInclinationValues(list);
   };
 
+  const handleInclinationDirectionToggle = (index: number, dir: string) => {
+    const list = [...currentInclinationValues];
+    while (list.length <= index) {
+      list.push({ name: `傾斜${list.length + 1}`, valueW: 0, valueL: 0, directions: [] });
+    }
+    const currentDirs = list[index].directions || [];
+    let nextDirs: string[];
+    if (currentDirs.includes(dir)) {
+      nextDirs = currentDirs.filter((d) => d !== dir);
+    } else {
+      nextDirs = [...currentDirs, dir];
+    }
+
+    const isSouthNorthBoth = (index === 0) && (nextDirs.includes('南') && nextDirs.includes('北'));
+    const isEastWestBoth = (index === 1) && (nextDirs.includes('東') && nextDirs.includes('西'));
+    const isBoth = isSouthNorthBoth || isEastWestBoth;
+
+    list[index] = {
+      ...list[index],
+      directions: nextDirs,
+      valueW: isBoth ? 0 : list[index].valueW,
+    };
+    updateInclinationValues(list);
+  };
+
   const handleClearInclinationValues = () => {
     updateInclinationValues([]);
   };
@@ -447,26 +510,103 @@ export const MainArea: React.FC<MainAreaProps> = ({
       return;
     }
 
-    let nextSelections: string[];
-    let nextDamages = [...currentCustomDamages];
-
     const baseName = btnName.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+
+    if (btnConfig?.category === '損傷') {
+      const currentDamages = selection.damages || [];
+      const exists = currentDamages.find(
+        (d) => d.name === btnName || d.name.replace(/^[左右上下]/, '') === baseName
+      );
+
+      let nextDamages: DamageItem[];
+      let nextCustomSelections: string[];
+
+      if (exists) {
+        nextDamages = currentDamages.filter(
+          (d) => d.name !== btnName && d.name.replace(/^[左右上下]/, '') !== baseName
+        );
+        nextCustomSelections = currentCustomSelections.filter(
+          (item) => item !== btnName && item.replace(/^[左右上下]/, '') !== baseName
+        );
+      } else {
+        const existingCustomDamage = currentCustomDamages.find(
+          (d) => d.name === btnName || d.name.replace(/^[左右上下]/, '') === baseName
+        );
+        const newItem: DamageItem = existingCustomDamage || { name: btnName, valueW: 0, valueL: 0 };
+
+        if (currentDamages.length >= 2) {
+          nextDamages = [currentDamages[1], newItem];
+        } else {
+          nextDamages = [...currentDamages, newItem];
+        }
+
+        const activeDamageNames = new Set(nextDamages.map((d) => d.name.replace(/^[左右上下]/, '')));
+        nextCustomSelections = currentCustomSelections.filter((name) => {
+          const customBase = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+          const config = displayedCustomButtons.find((b) => b.name === name || b.name === customBase);
+          if (config?.category === '損傷') {
+            return activeDamageNames.has(name) || activeDamageNames.has(customBase);
+          }
+          return true;
+        });
+        if (!nextCustomSelections.includes(btnName)) {
+          nextCustomSelections.push(btnName);
+        }
+      }
+
+      const updatedCustomDamages = currentCustomDamages.filter(
+        (d) => d.name !== btnName && d.name.replace(/^[左右上下]/, '') !== baseName
+      );
+      if (!exists) {
+        const itemToStore = nextDamages.find(
+          (d) => d.name === btnName || d.name.replace(/^[左右上下]/, '') === baseName
+        ) || { name: btnName, valueW: 0, valueL: 0 };
+        updatedCustomDamages.push(itemToStore);
+      }
+
+      if (isModeInternal) {
+        onChangeSelection({
+          ...selection,
+          damages: nextDamages,
+          internalSelections: nextCustomSelections,
+          internalDamages: updatedCustomDamages,
+          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+        });
+      } else if (isModeInclination) {
+        onChangeSelection({
+          ...selection,
+          damages: nextDamages,
+          inclinationSelections: nextCustomSelections,
+          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+        });
+      } else {
+        onChangeSelection({
+          ...selection,
+          damages: nextDamages,
+          externalSelections: nextCustomSelections,
+          externalDamages: updatedCustomDamages,
+          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+        });
+      }
+      return;
+    }
+
     const isCurrentlySelected = currentCustomSelections.some(
       (item) => item === btnName || item.replace(/^[左右上下]/, '') === baseName
     );
 
+    let nextSelections: string[];
+    let nextDamages = [...currentCustomDamages];
+
     if (isCurrentlySelected) {
       nextSelections = currentCustomSelections.filter(
-        (item) => item !== btnName && item.replace(/^[左右上下]/, '') !== baseName
+        (item) => item !== btnName && item.replace(/^[左右上下]/, '') === baseName
       );
       nextDamages = currentCustomDamages.filter(
         (d) => d.name !== btnName && d.name.replace(/^[左右上下]/, '') !== baseName
       );
     } else {
       nextSelections = [...currentCustomSelections, btnName];
-      if (btnConfig?.category === '損傷' && !nextDamages.some((d) => d.name === btnName)) {
-        nextDamages.push({ name: btnName, valueW: 0, valueL: 0 });
-      }
     }
 
     if (isModeInternal) {
@@ -535,14 +675,24 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
   // カスタム損傷数値 (W/L) 変更ヘルパー
   const updateCustomDamages = (newDamages: DamageItem[]) => {
+    const currentDamages = [...(selection.damages || [])];
+    const updatedDamages = currentDamages.map((d) => {
+      const match = newDamages.find(
+        (cd) => cd.name === d.name || cd.name.replace(/^[左右上下]/, '') === d.name.replace(/^[左右上下]/, '')
+      );
+      return match ? { ...d, ...match } : d;
+    });
+
     if (isModeInternal) {
       onChangeSelection({
         ...selection,
+        damages: updatedDamages,
         internalDamages: newDamages,
       });
     } else {
       onChangeSelection({
         ...selection,
+        damages: updatedDamages,
         externalDamages: newDamages,
       });
     }
@@ -675,17 +825,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (isModeInternal) {
       onChangeSelection({
         ...selection,
+        damages: nextDamages,
         internalSelections: nextSelections,
         internalDamages: nextDamages,
       });
     } else if (isModeInclination) {
       onChangeSelection({
         ...selection,
+        damages: nextDamages,
         inclinationSelections: nextSelections,
       });
     } else {
       onChangeSelection({
         ...selection,
+        damages: nextDamages,
         externalSelections: nextSelections,
         externalDamages: nextDamages,
       });
@@ -831,17 +984,35 @@ export const MainArea: React.FC<MainAreaProps> = ({
     }
   };
 
-  const handleLocationDrop = (fromName: string, toName: string) => {
-    if (fromName === toName) return;
-    const fromIdx = locationOptions.indexOf(fromName);
-    const toIdx = locationOptions.indexOf(toName);
+  const reorderItemInList = (
+    list: string[],
+    defaults: string[],
+    customNames: string[],
+    fromName: string,
+    toName: string
+  ): string[] => {
+    if (fromName === toName) return list;
+    const next = [...list];
+    const allAvailable = [...defaults, ...customNames];
+    allAvailable.forEach((name) => {
+      if (!next.includes(name)) next.push(name);
+    });
+    const fromIdx = next.indexOf(fromName);
+    const toIdx = next.indexOf(toName);
     if (fromIdx !== -1 && toIdx !== -1) {
-      const next = [...locationOptions];
       const [moved] = next.splice(fromIdx, 1);
       next.splice(toIdx, 0, moved);
-      setLocationOptions(next);
-      localStorage.setItem(STORAGE_KEY_LOCATION_ORDER, JSON.stringify(next));
     }
+    return next;
+  };
+
+  const handleLocationDrop = (fromName: string, toName: string) => {
+    const customNames = displayedCustomButtons
+      .filter((b) => b.category === '場所' && !b.isVoice && b.name !== '音声入力')
+      .map((b) => b.name);
+    const next = reorderItemInList(locationOptions, DEFAULT_LOCATION_OPTIONS, customNames, fromName, toName);
+    setLocationOptions(next);
+    localStorage.setItem(STORAGE_KEY_LOCATION_ORDER, JSON.stringify(next));
   };
 
   const handleDirectionDrop = (fromName: string, toName: string) => {
@@ -858,29 +1029,22 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handlePartDrop = (fromName: string, toName: string) => {
-    if (fromName === toName) return;
-    const fromIdx = partOptions.indexOf(fromName);
-    const toIdx = partOptions.indexOf(toName);
-    if (fromIdx !== -1 && toIdx !== -1) {
-      const next = [...partOptions];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      setPartOptions(next);
-      localStorage.setItem(STORAGE_KEY_PART_ORDER, JSON.stringify(next));
-    }
+    const customNames = displayedCustomButtons
+      .filter((b) => (b.category || '部位') === '部位' && !b.isVoice && b.name !== '音声入力')
+      .map((b) => b.name);
+    const next = reorderItemInList(partOptions, DEFAULT_PART_OPTIONS, customNames, fromName, toName);
+    setPartOptions(next);
+    localStorage.setItem(STORAGE_KEY_PART_ORDER, JSON.stringify(next));
   };
 
   const handleDamageDrop = (fromName: string, toName: string) => {
-    if (fromName === toName) return;
-    const fromIdx = damageOptions.indexOf(fromName);
-    const toIdx = damageOptions.indexOf(toName);
-    if (fromIdx !== -1 && toIdx !== -1) {
-      const next = [...damageOptions];
-      const [moved] = next.splice(fromIdx, 1);
-      next.splice(toIdx, 0, moved);
-      setDamageOptions(next);
-      localStorage.setItem(STORAGE_KEY_DAMAGE_ORDER, JSON.stringify(next));
-    }
+    const customNames = displayedCustomButtons
+      .filter((b) => b.category === '損傷' && !b.isVoice && b.name !== '音声入力')
+      .map((b) => b.name);
+    const defaults = isModeInternal ? DEFAULT_INTERNAL_SITUATION_OPTIONS : DEFAULT_DAMAGE_OPTIONS;
+    const next = reorderItemInList(damageOptions, defaults, customNames, fromName, toName);
+    setDamageOptions(next);
+    localStorage.setItem(STORAGE_KEY_DAMAGE_ORDER, JSON.stringify(next));
   };
 
   const handleInternalSituationDrop = (fromName: string, toName: string) => {
@@ -925,7 +1089,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
       setDraggedItem({ type, key });
       try {
         if (navigator.vibrate) navigator.vibrate(40);
-      } catch (err) {}
+      } catch (err) { }
     }, 250);
   };
 
@@ -1146,6 +1310,241 @@ export const MainArea: React.FC<MainAreaProps> = ({
               )}
             </button>
           );
+        })}
+      </div>
+    );
+  };
+
+  // 各グループへ既存ボタン＋カスタムボタンを統合して描画するヘルパー
+  const renderUnifiedCategoryButtons = (
+    cat: CustomButtonCategory,
+    defaultOptions: string[],
+    orderedOptions: string[],
+    dragType: string,
+    buttonStyle: React.CSSProperties,
+    gridColumns: string = 'repeat(4, 1fr)',
+    isDisabled: boolean = false
+  ) => {
+    const customBtns = displayedCustomButtons.filter(
+      (b) => (b.category || '部位') === cat && !b.isVoice && b.name !== '音声入力'
+    );
+    const customMap = new Map(customBtns.map((b) => [b.name, b]));
+
+    const allAvailableNames = new Set([...defaultOptions, ...customBtns.map((b) => b.name)]);
+
+    const orderedList: string[] = [];
+    orderedOptions.forEach((name) => {
+      if (allAvailableNames.has(name) && !orderedList.includes(name)) {
+        orderedList.push(name);
+      }
+    });
+    allAvailableNames.forEach((name) => {
+      if (!orderedList.includes(name)) {
+        orderedList.push(name);
+      }
+    });
+
+    if (orderedList.length === 0) return null;
+
+    return (
+      <div
+        className="button-grid-3"
+        style={{
+          gridTemplateColumns: gridColumns,
+          gap: '6px',
+          marginTop: '6px',
+        }}
+      >
+        {orderedList.map((btnName) => {
+          const customConfig = customMap.get(btnName);
+          const { dragClass, cursorStyle, dragEvents } = getDragProps(dragType, btnName, isDisabled);
+
+          if (customConfig) {
+            const isVoice = customConfig.isVoice || customConfig.name === '音声入力';
+            const baseName = customConfig.name;
+            const isLocation = customConfig.category === '場所';
+            const selectedIndex = currentCustomSelections.findIndex(
+              (item) =>
+                item === baseName ||
+                item.replace(/^[左右上下]/, '') === baseName ||
+                (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
+            );
+            const isSelected = selectedIndex !== -1;
+            const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
+
+            if (isVoice) {
+              return (
+                <button
+                  key={customConfig.id}
+                  type="button"
+                  className="btn"
+                  onClick={() => setIsVoiceModalOpen(true)}
+                  style={{
+                    ...buttonStyle,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                    borderColor: '#6366f1',
+                    borderWidth: '2px',
+                    color: '#3730a3',
+                    fontWeight: 'bold',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Mic size={16} color="#4f46e5" />
+                  <span>音声入力</span>
+                </button>
+              );
+            }
+
+            return (
+              <button
+                key={customConfig.id}
+                type="button"
+                disabled={isDisabled}
+                className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                onClick={() => {
+                  if (suppressClickRef.current) return;
+                  handleToggleCustomSelection(baseName);
+                }}
+                {...dragEvents}
+                style={{
+                  ...buttonStyle,
+                  position: 'relative',
+                  cursor: isDisabled ? 'not-allowed' : 'grab',
+                  opacity: isDisabled ? 0.5 : 1,
+                  ...cursorStyle,
+                }}
+              >
+                {displayName}
+                {isSelected && selectedIndex !== -1 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '2px',
+                      right: '4px',
+                      fontSize: '0.65rem',
+                      backgroundColor: '#ffffff',
+                      color: '#000000',
+                      borderRadius: '50%',
+                      width: '18px',
+                      height: '18px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '1px solid #222222',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {selectedIndex + 1}
+                  </span>
+                )}
+              </button>
+            );
+          } else {
+            if (cat === '場所') {
+              const isSelected = activeLocation === btnName;
+              return (
+                <button
+                  key={btnName}
+                  type="button"
+                  disabled={isDisabled}
+                  className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                  onClick={() => {
+                    if (suppressClickRef.current) return;
+                    handleLocationToggle(btnName);
+                  }}
+                  {...dragEvents}
+                  style={{
+                    ...buttonStyle,
+                    fontWeight: 'bold',
+                    cursor: isDisabled ? 'not-allowed' : 'grab',
+                    opacity: isDisabled ? 0.5 : 1,
+                    ...cursorStyle,
+                  }}
+                >
+                  {btnName}
+                </button>
+              );
+            } else if (cat === '部位') {
+              const isSelected = selection.part === btnName;
+              return (
+                <button
+                  key={btnName}
+                  type="button"
+                  disabled={isDisabled}
+                  className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                  onClick={() => {
+                    if (suppressClickRef.current) return;
+                    handlePartToggle(btnName);
+                  }}
+                  {...dragEvents}
+                  style={{
+                    ...buttonStyle,
+                    cursor: isDisabled ? 'not-allowed' : 'grab',
+                    opacity: isDisabled ? 0.5 : 1,
+                    ...cursorStyle,
+                  }}
+                >
+                  {btnName}
+                </button>
+              );
+            } else if (cat === '損傷') {
+              if (btnName === '現況' || btnName === '全景') {
+                const isSelected = selection.situationButton === btnName;
+                return (
+                  <button
+                    key={btnName}
+                    type="button"
+                    disabled={isDisabled}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleSituationToggle(btnName as '現況' | '全景');
+                    }}
+                    {...dragEvents}
+                    style={{
+                      ...buttonStyle,
+                      fontWeight: 'bold',
+                      cursor: isDisabled ? 'not-allowed' : 'grab',
+                      opacity: isDisabled ? 0.5 : 1,
+                      ...cursorStyle,
+                    }}
+                  >
+                    {btnName}
+                  </button>
+                );
+              }
+
+              const isSelected = (selection.damages || []).some(
+                (d) => d.name === btnName || d.name.replace(/^[左右上下]/, '') === btnName
+              );
+              return (
+                <button
+                  key={btnName}
+                  type="button"
+                  disabled={isDisabled}
+                  className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                  onClick={() => {
+                    if (suppressClickRef.current) return;
+                    handleDamageToggle(btnName);
+                  }}
+                  {...dragEvents}
+                  style={{
+                    ...buttonStyle,
+                    cursor: isDisabled ? 'not-allowed' : 'grab',
+                    opacity: isDisabled ? 0.5 : 1,
+                    ...cursorStyle,
+                  }}
+                >
+                  {btnName}
+                </button>
+              );
+            }
+            return null;
+          }
         })}
       </div>
     );
@@ -1434,36 +1833,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
               ② 場所グループ
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {locationOptions.map((loc) => {
-                const isSelected = activeLocation === loc;
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
-                return (
-                  <button
-                    key={loc}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handleLocationToggle(loc);
-                    }}
-                    {...dragEvents}
-                    style={{
-                      height: '48px',
-                      fontSize: '0.95rem',
-                      padding: '4px',
-                      fontWeight: 'bold',
-                      ...cursorStyle,
-                    }}
-                  >
-                    {loc}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 場所カスタムボタン */}
-            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
+            {/* 場所ボタン */}
+            {renderUnifiedCategoryButtons('場所', DEFAULT_LOCATION_OPTIONS, locationOptions, 'location', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 内部用 方向グループ（東西南北） */}
@@ -1540,7 +1911,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               ④ 部位グループ
             </div>
 
-            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
+            {renderUnifiedCategoryButtons('部位', DEFAULT_PART_OPTIONS, partOptions, 'part', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
               <p style={{ fontSize: '0.85rem', color: '#888', margin: 0, padding: '8px 0', textAlign: 'center' }}>
                 部位ボタンが登録されていません。下エリアから追加してください。
               </p>
@@ -1573,270 +1944,219 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-              {internalSituationOptions.map((btn) => {
-                const isSelected = selection.situationButton === btn;
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('internal-situation', btn);
-                return (
-                  <button
-                    key={btn}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handleSituationToggle(btn as '現況' | '全景');
-                    }}
-                    {...dragEvents}
-                    style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold', ...cursorStyle }}
-                  >
-                    {btn}
-                  </button>
-                );
-              })}
-            </div>
+            {renderUnifiedCategoryButtons('損傷', internalSituationOptions, damageOptions, 'damage', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
 
-            {/* 損傷カスタムボタン */}
-            {renderCustomButtonsForCategory('損傷', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
-          </section>
-
-          {/* ② 選択された「損傷」タイプの詳細入力（W / L 数値 & 全般/多数 プリセット） */}
-          {(() => {
-            const selectedCustomDamageNames = currentCustomSelections.filter((name) => {
-              const baseName = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
-              const btnConfig = customButtons.find((b) => b.name === name || b.name === baseName);
-              return btnConfig?.category === '損傷';
-            });
-
-            if (selectedCustomDamageNames.length === 0) return null;
-
-            return (
-              <section
+            {/* 選択された損傷の数値入力フォーム (数値W, 数値L / 全般, 多数) */}
+            {selection.damages && selection.damages.length > 0 && (
+              <div
                 style={{
-                  border: '2px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  backgroundColor: '#fff0f6',
+                  marginTop: '4px',
+                  padding: '8px 10px',
+                  backgroundColor: '#f8f9fa',
+                  border: '1px dashed var(--border-color)',
+                  borderRadius: '6px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
+                  gap: '10px',
                 }}
               >
-                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#d6336c' }}>
-                  損傷詳細入力（選択中: {selectedCustomDamageNames.join('、')}）
-                </div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#333' }}>
+                  損傷の数値入力・詳細指定
+                </span>
 
-                {selectedCustomDamageNames.map((btnName) => {
-                  const item = currentCustomDamages.find((d) => d.name === btnName) || {
-                    name: btnName,
-                    valueW: 0,
-                    valueL: 0,
-                  };
+                {selection.damages.map((dmg, idx) => (
+                  <div
+                    key={dmg.name}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      borderBottom: idx < selection.damages.length - 1 ? '1px dashed #ddd' : 'none',
+                      paddingBottom: idx < selection.damages.length - 1 ? '8px' : '0',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#111' }}>
+                        損傷{idx + 1}: {dmg.name}
+                      </span>
 
-                  return (
-                    <div
-                      key={btnName}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        padding: '8px 10px',
-                        border: '1px solid #fcc2d7',
-                        borderRadius: '6px',
-                        backgroundColor: '#ffffff',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#333' }}>
-                          ● {btnName}
-                        </span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button
-                            type="button"
-                            className={`btn ${currentCustomDamages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamageDirectionPreset(btnName, '左右')}
-                            disabled={selectedCustomDamageNames.length !== 1}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              opacity: selectedCustomDamageNames.length !== 1 ? 0.5 : 1,
-                              cursor: selectedCustomDamageNames.length !== 1 ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            左右
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${currentCustomDamages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamageDirectionPreset(btnName, '上下')}
-                            disabled={selectedCustomDamageNames.length !== 1}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              opacity: selectedCustomDamageNames.length !== 1 ? 0.5 : 1,
-                              cursor: selectedCustomDamageNames.length !== 1 ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            上下
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${item.isLessThan ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamageLessThanToggle(btnName)}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.8rem',
-                              height: '26px',
-                              fontWeight: 'bold',
-                            }}
-                            title="以下 (＜) を指定"
-                          >
-                            &lt;
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${item.valueW === 50 ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamage50Set(btnName)}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              fontWeight: item.valueW === 50 ? 'bold' : 'normal',
-                            }}
-                          >
-                            50
-                          </button>
-                          {(['全般', '多数'] as const).map((presetType) => {
-                            const isPresetSelected = item.preset === presetType;
-                            return (
-                              <button
-                                key={presetType}
-                                type="button"
-                                className={`btn ${isPresetSelected ? 'selected' : ''}`}
-                                onClick={() => handleCustomDamagePresetToggle(btnName, presetType)}
-                                style={{
-                                  padding: '2px 8px',
-                                  fontSize: '0.75rem',
-                                  height: '26px',
-                                }}
-                              >
-                                {presetType}
-                              </button>
-                            );
-                          })}
+                      {/* 「左右」「上下」「全般」「多数」ボタン */}
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button
+                          type="button"
+                          className={`btn ${selection.damages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
+                          onClick={() => handleDamageDirectionPreset('左右')}
+                          disabled={selection.damages.length !== 1}
+                          style={{
+                            height: '28px',
+                            fontSize: '0.75rem',
+                            padding: '0 8px',
+                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          左右
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${selection.damages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
+                          onClick={() => handleDamageDirectionPreset('上下')}
+                          disabled={selection.damages.length !== 1}
+                          style={{
+                            height: '28px',
+                            fontSize: '0.75rem',
+                            padding: '0 8px',
+                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          上下
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
+                          onClick={() => handleDamageLessThanToggle(idx)}
+                          style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
+                          title="以下 (＜) を指定"
+                        >
+                          &lt;
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
+                          onClick={() => handleDamage50Set(idx)}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
+                        >
+                          50
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${dmg.preset === '全般' ? 'selected' : ''}`}
+                          onClick={() => handleDamagePresetToggle(idx, '全般')}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                        >
+                          全般
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${dmg.preset === '多数' ? 'selected' : ''}`}
+                          onClick={() => handleDamagePresetToggle(idx, '多数')}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                        >
+                          多数
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 「全般」「多数」が未選択の場合のみ数値(W/L)入力ボックスを表示 */}
+                    {!dmg.preset && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {/* 数値1W / 数値2W */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                            数値{idx + 1}W:
+                          </span>
+                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, -1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, -0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              -0.5
+                            </button>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="stepper-input"
+                              value={dmg.valueW || ''}
+                              placeholder="0"
+                              onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
+                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
+                            />
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, 0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              +0.5
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueWChange(idx, 1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 数値1L / 数値2L */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                            数値{idx + 1}L:
+                          </span>
+                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, -1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
+                            >
+                              <Minus size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, -0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              -0.5
+                            </button>
+                            <input
+                              type="number"
+                              step="0.1"
+                              className="stepper-input"
+                              value={dmg.valueL || ''}
+                              placeholder="0"
+                              onChange={(e) => handleDamageValueLInput(idx, e.target.value)}
+                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
+                            />
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, 0.5)}
+                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                            >
+                              +0.5
+                            </button>
+                            <button
+                              type="button"
+                              className="btn stepper-btn"
+                              onClick={() => handleDamageValueLChange(idx, 1.0)}
+                              style={{ flex: 1, height: '34px', padding: 0 }}
+                            >
+                              <Plus size={12} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-
-                      {!item.preset && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {/* 数値W */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                              数値W:
-                            </span>
-                            <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Minus size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                -0.5
-                              </button>
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                className="stepper-input"
-                                value={item.valueW || ''}
-                                onChange={(e) => handleCustomDamageWInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                              />
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                +0.5
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* 数値L */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                              数値L:
-                            </span>
-                            <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Minus size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                -0.5
-                              </button>
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                className="stepper-input"
-                                value={item.valueL || ''}
-                                onChange={(e) => handleCustomDamageLInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                              />
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                +0.5
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            );
-          })()}
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
 
           {/* ③ 状況グループ */}
           <section
@@ -1885,6 +2205,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   minWidth: 0,
                 }}
               />
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
+                onClick={() =>
+                  onChangeSelection({
+                    ...selection,
+                    situationText: '現場より撮影',
+                  })
+                }
+                style={{
+                  height: '42px',
+                  padding: '0 16px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  flexShrink: 0,
+                }}
+              >
+                現場
+              </button>
             </div>
           </section>
 
@@ -2216,36 +2555,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
               ② 場所グループ
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {locationOptions.map((loc) => {
-                const isSelected = activeLocation === loc;
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
-                return (
-                  <button
-                    key={loc}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handleLocationToggle(loc);
-                    }}
-                    {...dragEvents}
-                    style={{
-                      height: '48px',
-                      fontSize: '0.95rem',
-                      padding: '4px',
-                      fontWeight: 'bold',
-                      ...cursorStyle,
-                    }}
-                  >
-                    {loc}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 場所カスタムボタン */}
-            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
+            {/* 場所ボタン */}
+            {renderUnifiedCategoryButtons('場所', DEFAULT_LOCATION_OPTIONS, locationOptions, 'location', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 傾斜用 方向グループ */}
@@ -2322,7 +2633,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               ④ 部位グループ
             </div>
 
-            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
+            {renderUnifiedCategoryButtons('部位', DEFAULT_PART_OPTIONS, partOptions, 'part', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
               <p style={{ fontSize: '0.85rem', color: '#888', margin: 0, padding: '8px 0', textAlign: 'center' }}>
                 部位ボタンが登録されていません。下エリアから追加してください。
               </p>
@@ -2356,8 +2667,15 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             {[0, 1].map((idx) => {
-              const item = currentInclinationValues[idx] || { name: `傾斜${idx + 1}`, valueW: 0, valueL: 0 };
+              const item = currentInclinationValues[idx] || { name: `傾斜${idx + 1}`, valueW: 0, valueL: 0, directions: [] };
+              const dirs = item.directions || [];
               const isNegative = (item.valueW || 0) < 0;
+
+              const dirButtons = idx === 0 ? ['南', '北'] : ['東', '西'];
+              const isSouthNorthBoth = idx === 0 && dirs.includes('南') && dirs.includes('北');
+              const isEastWestBoth = idx === 1 && dirs.includes('東') && dirs.includes('西');
+              const isBoth = isSouthNorthBoth || isEastWestBoth;
+
               return (
                 <div
                   key={idx}
@@ -2366,20 +2684,45 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     alignItems: 'center',
                     gap: '8px',
                     padding: '6px 8px',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: isBoth ? '#fef2f2' : '#ffffff',
                     borderRadius: '6px',
-                    border: '1px solid #bbf7d0',
+                    border: isBoth ? '1px solid #fca5a5' : '1px solid #bbf7d0',
                   }}
                 >
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', minWidth: '46px', color: '#166534' }}>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', minWidth: '46px', color: isBoth ? '#991b1b' : '#166534', flexShrink: 0 }}>
                     数値{idx + 1}:
                   </span>
+
+                  {/* 方向ボタン（数値1: 南/北, 数値2: 東/西） */}
+                  <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
+                    {dirButtons.map((dir) => {
+                      const isDirSelected = dirs.includes(dir);
+                      return (
+                        <button
+                          key={dir}
+                          type="button"
+                          className={`btn ${isDirSelected ? 'selected' : ''}`}
+                          onClick={() => handleInclinationDirectionToggle(idx, dir)}
+                          style={{
+                            height: '36px',
+                            minWidth: '36px',
+                            padding: '0 8px',
+                            fontSize: '0.9rem',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {dir}
+                        </button>
+                      );
+                    })}
+                  </div>
 
                   {/* マイナス (－) 切り替えボタン */}
                   <button
                     type="button"
                     className={`btn ${isNegative ? 'selected' : ''}`}
                     onClick={() => handleInclinationMinusToggle(idx)}
+                    disabled={isBoth}
                     style={{
                       height: '36px',
                       width: '36px',
@@ -2387,18 +2730,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       padding: 0,
                       fontWeight: 'bold',
                       flexShrink: 0,
+                      opacity: isBoth ? 0.4 : 1,
+                      cursor: isBoth ? 'not-allowed' : 'pointer',
                     }}
                     title="マイナス符号 (－) を切り替え"
                   >
                     －
                   </button>
 
-                  <div className="number-stepper" style={{ flex: 1, gap: '4px' }}>
+                  <div className="number-stepper" style={{ flex: 1, gap: '4px', opacity: isBoth ? 0.4 : 1 }}>
                     <button
                       type="button"
                       className="btn stepper-btn"
                       onClick={() => handleInclinationValueChange(idx, -1.0)}
-                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold' }}
+                      disabled={isBoth}
+                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold', cursor: isBoth ? 'not-allowed' : 'pointer' }}
                     >
                       -1.0
                     </button>
@@ -2406,8 +2752,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       type="number"
                       step="0.1"
                       className="stepper-input"
-                      value={item.valueW !== undefined && item.valueW !== 0 ? item.valueW : (item.valueW === 0 ? '' : item.valueW)}
-                      placeholder="0"
+                      disabled={isBoth}
+                      value={isBoth ? '' : (item.valueW !== undefined && item.valueW !== 0 ? item.valueW : (item.valueW === 0 ? '' : item.valueW))}
+                      placeholder={isBoth ? (idx === 0 ? '南北0' : '東西0') : '0'}
                       onChange={(e) => handleInclinationValueInput(idx, e.target.value)}
                       style={{
                         height: '36px',
@@ -2417,13 +2764,16 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         textAlign: 'center',
                         padding: '0 2px',
                         fontWeight: 'bold',
+                        cursor: isBoth ? 'not-allowed' : 'text',
+                        backgroundColor: isBoth ? '#f1f5f9' : '#ffffff',
                       }}
                     />
                     <button
                       type="button"
                       className="btn stepper-btn"
                       onClick={() => handleInclinationValueChange(idx, 1.0)}
-                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold' }}
+                      disabled={isBoth}
+                      style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold', cursor: isBoth ? 'not-allowed' : 'pointer' }}
                     >
                       +1.0
                     </button>
@@ -2431,6 +2781,75 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 </div>
               );
             })}
+          </section>
+
+          {/* ⑤ 状況グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FileText size={18} />
+                ⑤ 状況グループ
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                className="stepper-input"
+                placeholder="テキスト入力"
+                value={selection.situationText || ''}
+                onChange={(e) =>
+                  onChangeSelection({
+                    ...selection,
+                    situationText: e.target.value,
+                  })
+                }
+                style={{
+                  flex: 1,
+                  height: '42px',
+                  fontSize: '0.95rem',
+                  textAlign: 'left',
+                  padding: '0 10px',
+                  minWidth: 0,
+                }}
+              />
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
+                onClick={() =>
+                  onChangeSelection({
+                    ...selection,
+                    situationText: '現場より撮影',
+                  })
+                }
+                style={{
+                  height: '42px',
+                  padding: '0 16px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  flexShrink: 0,
+                }}
+              >
+                現場
+              </button>
+            </div>
           </section>
 
           {/* ⑥ 傾斜用カスタムボタン管理エリア */}
@@ -2604,15 +3023,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         <button
                           type="button"
                           onClick={() => handleToggleCategory(btnConfig.id)}
-                          className={`category-badge ${
-                            btnConfig.category === '場所'
-                              ? 'category-location'
-                              : btnConfig.category === '階数'
-                                ? 'category-floor'
-                                : btnConfig.category === '部位'
-                                  ? 'category-part'
-                                  : 'category-damage'
-                          }`}
+                          className={`category-badge ${btnConfig.category === '場所'
+                            ? 'category-location'
+                            : btnConfig.category === '階数'
+                              ? 'category-floor'
+                              : btnConfig.category === '部位'
+                                ? 'category-part'
+                                : 'category-damage'
+                            }`}
                           style={{ cursor: 'pointer', border: 'none' }}
                           title="クリックして種類切り替え"
                         >
@@ -2813,36 +3231,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {locationOptions.map((loc) => {
-                const isSelected = activeLocation === loc;
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
-                return (
-                  <button
-                    key={loc}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handleLocationToggle(loc);
-                    }}
-                    {...dragEvents}
-                    style={{
-                      height: '48px',
-                      fontSize: '0.95rem',
-                      padding: '4px',
-                      fontWeight: 'bold',
-                      ...cursorStyle,
-                    }}
-                  >
-                    {loc}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 場所カスタムボタン */}
-            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
+            {/* 場所ボタン */}
+            {renderUnifiedCategoryButtons('場所', DEFAULT_LOCATION_OPTIONS, locationOptions, 'location', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 方向グループ */}
@@ -2922,30 +3312,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-              {partOptions.map((part) => {
-                const isSelected = selection.part === part;
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('part', part);
-                return (
-                  <button
-                    key={part}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handlePartToggle(part);
-                    }}
-                    {...dragEvents}
-                    style={{ height: '48px', fontSize: '0.95rem', padding: '4px', ...cursorStyle }}
-                  >
-                    {part}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 部位カスタムボタン */}
-            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)')}
+            {renderUnifiedCategoryButtons('部位', DEFAULT_PART_OPTIONS, partOptions, 'part', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)')}
           </section>
 
           {/* ⑤ 損傷グループ */}
@@ -2977,51 +3344,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-              {damageOptions.map((dmg) => {
-                const { dragClass, cursorStyle, dragEvents } = getDragProps('damage', dmg);
-                if (dmg === '現況' || dmg === '全景') {
-                  const isSelected = selection.situationButton === dmg;
-                  return (
-                    <button
-                      key={dmg}
-                      type="button"
-                      className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                      onClick={() => {
-                        if (suppressClickRef.current) return;
-                        handleSituationToggle(dmg as '現況' | '全景');
-                      }}
-                      {...dragEvents}
-                      style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold', ...cursorStyle }}
-                    >
-                      {dmg}
-                    </button>
-                  );
-                }
-
-                const isSelected = (selection.damages || []).some(
-                  (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg
-                );
-                return (
-                  <button
-                    key={dmg}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
-                    onClick={() => {
-                      if (suppressClickRef.current) return;
-                      handleDamageToggle(dmg);
-                    }}
-                    {...dragEvents}
-                    style={{ height: '48px', fontSize: '1rem', ...cursorStyle }}
-                  >
-                    {dmg}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* 損傷カスタムボタン */}
-            {renderCustomButtonsForCategory('損傷', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
+            {renderUnifiedCategoryButtons('損傷', DEFAULT_DAMAGE_OPTIONS, damageOptions, 'damage', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
 
             {/* 選択された損傷の数値入力フォーム (数値W, 数値L / 全般, 多数) */}
             {selection.damages && selection.damages.length > 0 && (
@@ -3235,230 +3558,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             )}
           </section>
 
-          {/* 選択されたカスタム「損傷」タイプの詳細入力 */}
-          {(() => {
-            const selectedCustomDamageNames = currentCustomSelections.filter((name) => {
-              const baseName = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
-              const btnConfig = customButtons.find((b) => b.name === name || b.name === baseName);
-              return btnConfig?.category === '損傷';
-            });
 
-            if (selectedCustomDamageNames.length === 0) return null;
-
-            return (
-              <section
-                style={{
-                  border: '2px solid var(--border-color)',
-                  borderRadius: '8px',
-                  padding: '10px 12px',
-                  backgroundColor: '#fff0f6',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '12px',
-                }}
-              >
-                <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#d6336c' }}>
-                  外部カスタム損傷詳細入力（選択中: {selectedCustomDamageNames.join('、')}）
-                </div>
-
-                {selectedCustomDamageNames.map((btnName) => {
-                  const item = currentCustomDamages.find((d) => d.name === btnName) || {
-                    name: btnName,
-                    valueW: 0,
-                    valueL: 0,
-                  };
-
-                  return (
-                    <div
-                      key={btnName}
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '8px',
-                        padding: '8px 10px',
-                        border: '1px solid #fcc2d7',
-                        borderRadius: '6px',
-                        backgroundColor: '#ffffff',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#333' }}>
-                          ● {btnName}
-                        </span>
-                        <div style={{ display: 'flex', gap: '4px' }}>
-                          <button
-                            type="button"
-                            className={`btn ${currentCustomDamages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamageDirectionPreset(btnName, '左右')}
-                            disabled={selectedCustomDamageNames.length !== 1}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              opacity: selectedCustomDamageNames.length !== 1 ? 0.5 : 1,
-                              cursor: selectedCustomDamageNames.length !== 1 ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            左右
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${currentCustomDamages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamageDirectionPreset(btnName, '上下')}
-                            disabled={selectedCustomDamageNames.length !== 1}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              opacity: selectedCustomDamageNames.length !== 1 ? 0.5 : 1,
-                              cursor: selectedCustomDamageNames.length !== 1 ? 'not-allowed' : 'pointer',
-                            }}
-                          >
-                            上下
-                          </button>
-                          <button
-                            type="button"
-                            className={`btn ${item.valueW === 50 ? 'selected' : ''}`}
-                            onClick={() => handleCustomDamage50Set(btnName)}
-                            style={{
-                              padding: '2px 8px',
-                              fontSize: '0.75rem',
-                              height: '26px',
-                              fontWeight: item.valueW === 50 ? 'bold' : 'normal',
-                            }}
-                          >
-                            50
-                          </button>
-                          {(['全般', '多数'] as const).map((presetType) => {
-                            const isPresetSelected = item.preset === presetType;
-                            return (
-                              <button
-                                key={presetType}
-                                type="button"
-                                className={`btn ${isPresetSelected ? 'selected' : ''}`}
-                                onClick={() => handleCustomDamagePresetToggle(btnName, presetType)}
-                                style={{
-                                  padding: '2px 8px',
-                                  fontSize: '0.75rem',
-                                  height: '26px',
-                                }}
-                              >
-                                {presetType}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {!item.preset && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                          {/* 数値W */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                              数値W:
-                            </span>
-                            <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Minus size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, -0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                -0.5
-                              </button>
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                className="stepper-input"
-                                value={item.valueW || ''}
-                                onChange={(e) => handleCustomDamageWInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                              />
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                +0.5
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageWChange(btnName, 1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* 数値L */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                              数値L:
-                            </span>
-                            <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Minus size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, -0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                -0.5
-                              </button>
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                className="stepper-input"
-                                value={item.valueL || ''}
-                                onChange={(e) => handleCustomDamageLInput(btnName, e.target.value)}
-                                style={{ height: '32px', fontSize: '0.85rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                              />
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 0.5)}
-                                style={{ flex: 1, height: '32px', fontSize: '0.75rem', padding: 0 }}
-                              >
-                                +0.5
-                              </button>
-                              <button
-                                type="button"
-                                className="btn stepper-btn"
-                                onClick={() => handleCustomDamageLChange(btnName, 1.0)}
-                                style={{ flex: 1, height: '32px', padding: 0 }}
-                              >
-                                <Plus size={12} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </section>
-            );
-          })()}
 
           {/* ⑥ 状況グループ */}
           <section
@@ -3508,6 +3608,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   minWidth: 0,
                 }}
               />
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
+                onClick={() =>
+                  onChangeSelection({
+                    ...selection,
+                    situationText: '現場より撮影',
+                  })
+                }
+                style={{
+                  height: '42px',
+                  padding: '0 16px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                  flexShrink: 0,
+                }}
+              >
+                現場
+              </button>
             </div>
           </section>
 

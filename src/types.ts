@@ -29,6 +29,7 @@ export interface DamageItem {
   preset?: '全般' | '多数' | null; // 全般 / 多数 選択肢
   isLessThan?: boolean; // 「以下」フラグ (<〇〇)
   value?: number; // 互換性用
+  directions?: string[]; // 傾斜モード等での方向指定 ['南', '北'] / ['東', '西']
 }
 
 export type CustomButtonCategory = '場所' | '階数' | '部位' | '損傷';

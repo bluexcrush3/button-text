@@ -67,10 +67,10 @@ export interface LineComponents {
 export type CustomButtonsInput =
   | CustomButtonConfig[]
   | {
-      internal?: CustomButtonConfig[];
-      external?: CustomButtonConfig[];
-      inclination?: CustomButtonConfig[];
-    };
+    internal?: CustomButtonConfig[];
+    external?: CustomButtonConfig[];
+    inclination?: CustomButtonConfig[];
+  };
 
 export function getLineComponents(
   selection: LineSelection,
@@ -130,8 +130,11 @@ export function getLineComponents(
   const customDamageItemsList: DamageItem[] = [];
 
   selectedBtnNames.forEach((btnName) => {
-    const baseName = btnName.replace(/[①-⑳]/g, '');
-    const btnConfig = customButtons.find((b) => b.name === btnName || b.name === baseName);
+    const baseName = btnName.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+    const btnConfig =
+      customButtons.find((b) => b.name === btnName) ||
+      customButtons.find((b) => b.name === btnName.replace(/[①-⑳]/g, '')) ||
+      customButtons.find((b) => b.name === baseName);
     const cat = btnConfig?.category || '部位';
 
     if (cat === '場所') {
@@ -141,8 +144,10 @@ export function getLineComponents(
     } else if (cat === '部位') {
       partNames.push(btnName);
     } else if (cat === '損傷') {
-      const dmgInfo = selectedDamages.find((d) => d.name === btnName);
-      const itemToPush: DamageItem = dmgInfo ? { ...dmgInfo } : { name: btnName, valueW: 0, valueL: 0 };
+      const dmgInfo =
+        selectedDamages.find((d) => d.name === btnName) ||
+        selectedDamages.find((d) => d.name === baseName || d.name.replace(/^[左右上下]/, '') === baseName);
+      const itemToPush: DamageItem = dmgInfo ? { ...dmgInfo, name: btnName } : { name: btnName, valueW: 0, valueL: 0 };
       customDamageItemsList.push(itemToPush);
 
       if (!dmgInfo) {
@@ -226,13 +231,30 @@ export function getLineComponents(
     const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
     const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
 
+    const damageItemsList: DamageItem[] = (selection.damages && selection.damages.length > 0)
+      ? selection.damages
+      : customDamageItemsList;
+
+    const damageStringsList: string[] = (selection.damages && selection.damages.length > 0)
+      ? selection.damages.map((d) => {
+        if (d.preset) return `${d.name}${d.preset}`;
+        const wVal = d.valueW ?? 0;
+        const lVal = d.valueL ?? 0;
+        const wPrefix = d.isLessThan ? '<' : '';
+        if (wVal > 0 && lVal > 0) return `${d.name}W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+        if (wVal > 0) return `${d.name}W${wPrefix}${formatDamageValue(wVal)}`;
+        if (lVal > 0) return `${d.name}L${formatDamageValue(lVal)}`;
+        return d.name;
+      })
+      : customDamageStrings;
+
     return {
       location,
       floor,
       direction,
       part: [selection.part, ...partNames].filter(Boolean).join(''),
-      damages: customDamageStrings,
-      damageItems: customDamageItemsList,
+      damages: damageStringsList,
+      damageItems: damageItemsList,
       situation,
     };
   } else {
@@ -247,13 +269,13 @@ export function getLineComponents(
 
     const part = [selection.part, ...partNames].filter(Boolean).join('');
 
-    const standardDamageStrings: string[] = [];
-    const standardDamageItemsList: DamageItem[] = selection.damages || [];
+    const allDamageStrings: string[] = [];
+    const allDamageItems: DamageItem[] = selection.damages || [];
 
-    if (selection.damages && selection.damages.length > 0) {
-      selection.damages.forEach((d) => {
+    if (allDamageItems.length > 0) {
+      allDamageItems.forEach((d) => {
         if (d.preset) {
-          standardDamageStrings.push(`${d.name}${d.preset}`);
+          allDamageStrings.push(`${d.name}${d.preset}`);
         } else {
           const wVal = d.valueW ?? d.value ?? 0;
           const lVal = d.valueL ?? 0;
@@ -266,20 +288,17 @@ export function getLineComponents(
           } else if (lVal > 0) {
             valStr = `L${formatDamageValue(lVal)}`;
           }
-          standardDamageStrings.push(`${d.name}${valStr}`);
+          allDamageStrings.push(`${d.name}${valStr}`);
         }
       });
     }
-
-    const allDamages = [...standardDamageStrings, ...customDamageStrings];
-    const allDamageItems = [...standardDamageItemsList, ...customDamageItemsList];
 
     return {
       location,
       floor,
       direction,
       part,
-      damages: allDamages,
+      damages: allDamageStrings,
       damageItems: allDamageItems,
       situation,
     };
@@ -312,8 +331,31 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
   const wPrefix = item.isLessThan ? '<' : '';
 
   if (isInclination) {
+    const dirs = item.directions || [];
+    const nameStr = item.name || '';
+    const hasSouth = dirs.includes('南') || nameStr.includes('南');
+    const hasNorth = dirs.includes('北') || nameStr.includes('北');
+    const hasEast = dirs.includes('東') || nameStr.includes('東');
+    const hasWest = dirs.includes('西') || nameStr.includes('西');
+
+    if ((hasSouth && hasNorth) || nameStr.includes('南北0')) {
+      return '南北0';
+    }
+    if ((hasEast && hasWest) || nameStr.includes('東西0')) {
+      return '東西0';
+    }
+
+    let dirPrefix = '';
+    if (hasSouth) dirPrefix = '南';
+    else if (hasNorth) dirPrefix = '北';
+    else if (hasEast) dirPrefix = '東';
+    else if (hasWest) dirPrefix = '西';
+
     if (wVal !== 0) {
-      return `${wPrefix}${formatDamageValue(wVal)}`;
+      return `${dirPrefix}${wPrefix}${formatDamageValue(wVal)}`;
+    }
+    if (dirPrefix) {
+      return `${dirPrefix}0`;
     }
     return '';
   }
@@ -393,21 +435,22 @@ export function generateLineTextForSpreadsheet(
       col3 = damagePartText;
     }
   } else if (count === 1) {
-    const { baseName } = parseDamageName(items[0].name);
+    const { prefix, baseName } = parseDamageName(items[0].name);
     const valDetail = formatDamageValueDetail(items[0]);
     const damagePartText = sitBtn ? `${baseName}・${sitBtn}` : baseName;
+    const formattedVal = prefix && valDetail ? `${prefix}${valDetail}` : valDetail;
 
     if (hasLocation) {
       // ① "場所"あり / 損傷1つ
       col1 = locationAndFloor;
       col3 = [part, damagePartText].filter(Boolean).join('　');
-      col4 = valDetail;
+      col4 = formattedVal;
       col5 = '';
     } else {
       // ④ "場所"なし / 損傷1つ
       col1 = part;
       col3 = damagePartText;
-      col4 = valDetail;
+      col4 = formattedVal;
       col5 = '';
     }
   } else {

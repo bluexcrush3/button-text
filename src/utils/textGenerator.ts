@@ -230,7 +230,7 @@ export function getLineComponents(
       location,
       floor,
       direction,
-      part: partNames.join(''),
+      part: [selection.part, ...partNames].filter(Boolean).join(''),
       damages: customDamageStrings,
       damageItems: customDamageItemsList,
       situation,

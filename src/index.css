@@ -615,6 +615,12 @@ button.btn-danger:active {
   border-style: dashed !important;
 }
 
+.custom-btn-item.drag-target {
+  outline: 2px dashed #4f46e5 !important;
+  outline-offset: 2px;
+  transform: scale(1.02);
+}
+
 .category-badge {
   font-size: 0.65rem;
   padding: 1px 5px;

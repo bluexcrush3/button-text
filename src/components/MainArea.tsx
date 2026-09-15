@@ -16,6 +16,37 @@ interface MainAreaProps {
   onChangeInclinationCustomButtons: (newButtons: CustomButtonConfig[]) => void;
 }
 
+const DEFAULT_LOCATION_OPTIONS = ['建物', '外構', '土間', '塀', '植込', '擁壁'];
+const DEFAULT_DIRECTION_OPTIONS = ['北', '西', '南', '東'];
+const DEFAULT_PART_OPTIONS = ['壁', '腰', '軒', '屋根'];
+const DEFAULT_DAMAGE_OPTIONS = ['現況', '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ', '全景'];
+const DEFAULT_INTERNAL_SITUATION_OPTIONS = ['現況', '全景'];
+
+const STORAGE_KEY_LOCATION_ORDER = 'btn_text_gen_location_order_v2';
+const STORAGE_KEY_DIRECTION_ORDER = 'btn_text_gen_direction_order_v2';
+const STORAGE_KEY_PART_ORDER = 'btn_text_gen_part_order_v2';
+const STORAGE_KEY_DAMAGE_ORDER = 'btn_text_gen_damage_order_v2';
+const STORAGE_KEY_INTERNAL_SITUATION_ORDER = 'btn_text_gen_internal_situation_order_v2';
+
+const loadOrderedList = (key: string, defaults: string[]): string[] => {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      const parsed: string[] = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const validItems = parsed.filter((item) => defaults.includes(item));
+        defaults.forEach((item) => {
+          if (!validItems.includes(item)) validItems.push(item);
+        });
+        return validItems;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+  return defaults;
+};
+
 export const MainArea: React.FC<MainAreaProps> = ({
   surveyType,
   selection,
@@ -760,18 +791,373 @@ export const MainArea: React.FC<MainAreaProps> = ({
     setDraggedIdx(null);
   };
 
-  const LOCATION_OPTIONS = ['建物', '外構', '土間', '塀', '植込', '擁壁'];
-  const DIRECTION_OPTIONS = ['北', '西', '南', '東'];
-  const PART_OPTIONS = ['壁', '腰', '軒', '屋根'];
-  const DAMAGE_OPTIONS = ['亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ'];
+  // 各グループ固定ボタンの並び順ステート（localStorage連動）
+  const [locationOptions, setLocationOptions] = useState<string[]>(() =>
+    loadOrderedList(STORAGE_KEY_LOCATION_ORDER, DEFAULT_LOCATION_OPTIONS)
+  );
+  const [directionOptions, setDirectionOptions] = useState<string[]>(() =>
+    loadOrderedList(STORAGE_KEY_DIRECTION_ORDER, DEFAULT_DIRECTION_OPTIONS)
+  );
+  const [partOptions, setPartOptions] = useState<string[]>(() =>
+    loadOrderedList(STORAGE_KEY_PART_ORDER, DEFAULT_PART_OPTIONS)
+  );
+  const [damageOptions, setDamageOptions] = useState<string[]>(() =>
+    loadOrderedList(STORAGE_KEY_DAMAGE_ORDER, DEFAULT_DAMAGE_OPTIONS)
+  );
+  const [internalSituationOptions, setInternalSituationOptions] = useState<string[]>(() =>
+    loadOrderedList(STORAGE_KEY_INTERNAL_SITUATION_ORDER, DEFAULT_INTERNAL_SITUATION_OPTIONS)
+  );
+
+  // ドラッグ中アイテムの状態（カスタムまたは固定ボタン）
+  const [draggedItem, setDraggedItem] = useState<{ type: string; key: string } | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<string | null>(null);
+
+  // 長押し＆タッチ操作管理用ref
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchDraggingRef = useRef<boolean>(false);
+  const suppressClickRef = useRef<boolean>(false);
+  const touchDraggedItemRef = useRef<{ type: string; key: string } | null>(null);
+  const currentDragOverTargetRef = useRef<string | null>(null);
+
+  const handleCustomButtonDrop = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    const fromIdx = customButtons.findIndex((b) => b.id === fromId);
+    const toIdx = customButtons.findIndex((b) => b.id === toId);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const updated = [...customButtons];
+      const [moved] = updated.splice(fromIdx, 1);
+      updated.splice(toIdx, 0, moved);
+      onChangeCustomButtons(updated);
+    }
+  };
+
+  const handleLocationDrop = (fromName: string, toName: string) => {
+    if (fromName === toName) return;
+    const fromIdx = locationOptions.indexOf(fromName);
+    const toIdx = locationOptions.indexOf(toName);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const next = [...locationOptions];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setLocationOptions(next);
+      localStorage.setItem(STORAGE_KEY_LOCATION_ORDER, JSON.stringify(next));
+    }
+  };
+
+  const handleDirectionDrop = (fromName: string, toName: string) => {
+    if (fromName === toName) return;
+    const fromIdx = directionOptions.indexOf(fromName);
+    const toIdx = directionOptions.indexOf(toName);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const next = [...directionOptions];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setDirectionOptions(next);
+      localStorage.setItem(STORAGE_KEY_DIRECTION_ORDER, JSON.stringify(next));
+    }
+  };
+
+  const handlePartDrop = (fromName: string, toName: string) => {
+    if (fromName === toName) return;
+    const fromIdx = partOptions.indexOf(fromName);
+    const toIdx = partOptions.indexOf(toName);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const next = [...partOptions];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setPartOptions(next);
+      localStorage.setItem(STORAGE_KEY_PART_ORDER, JSON.stringify(next));
+    }
+  };
+
+  const handleDamageDrop = (fromName: string, toName: string) => {
+    if (fromName === toName) return;
+    const fromIdx = damageOptions.indexOf(fromName);
+    const toIdx = damageOptions.indexOf(toName);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const next = [...damageOptions];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setDamageOptions(next);
+      localStorage.setItem(STORAGE_KEY_DAMAGE_ORDER, JSON.stringify(next));
+    }
+  };
+
+  const handleInternalSituationDrop = (fromName: string, toName: string) => {
+    if (fromName === toName) return;
+    const fromIdx = internalSituationOptions.indexOf(fromName);
+    const toIdx = internalSituationOptions.indexOf(toName);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const next = [...internalSituationOptions];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      setInternalSituationOptions(next);
+      localStorage.setItem(STORAGE_KEY_INTERNAL_SITUATION_ORDER, JSON.stringify(next));
+    }
+  };
+
+  const executeDrop = (type: string, fromKey: string, toKey: string) => {
+    if (type.startsWith('custom-')) {
+      handleCustomButtonDrop(fromKey, toKey);
+    } else if (type === 'location') {
+      handleLocationDrop(fromKey, toKey);
+    } else if (type === 'direction') {
+      handleDirectionDrop(fromKey, toKey);
+    } else if (type === 'part') {
+      handlePartDrop(fromKey, toKey);
+    } else if (type === 'damage') {
+      handleDamageDrop(fromKey, toKey);
+    } else if (type === 'internal-situation') {
+      handleInternalSituationDrop(fromKey, toKey);
+    }
+  };
+
+  const handleItemTouchStart = (type: string, key: string, e: React.TouchEvent) => {
+    if (touchTimerRef.current) clearTimeout(touchTimerRef.current);
+    const touch = e.touches[0];
+    touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    isTouchDraggingRef.current = false;
+    touchDraggedItemRef.current = { type, key };
+    currentDragOverTargetRef.current = null;
+
+    touchTimerRef.current = setTimeout(() => {
+      isTouchDraggingRef.current = true;
+      setDraggedItem({ type, key });
+      try {
+        if (navigator.vibrate) navigator.vibrate(40);
+      } catch (err) {}
+    }, 250);
+  };
+
+  const handleItemTouchMove = (e: React.TouchEvent) => {
+    if (!touchStartPosRef.current || !touchDraggedItemRef.current) return;
+    const touch = e.touches[0];
+
+    if (!isTouchDraggingRef.current) {
+      const dist = Math.hypot(
+        touch.clientX - touchStartPosRef.current.x,
+        touch.clientY - touchStartPosRef.current.y
+      );
+      if (dist > 10) {
+        if (touchTimerRef.current) {
+          clearTimeout(touchTimerRef.current);
+          touchTimerRef.current = null;
+        }
+      }
+      return;
+    }
+
+    if (e.cancelable) e.preventDefault();
+
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const targetEl = el?.closest(`[data-drag-type="${touchDraggedItemRef.current.type}"]`);
+    if (targetEl) {
+      const targetKey = targetEl.getAttribute('data-drag-key');
+      if (targetKey && targetKey !== touchDraggedItemRef.current.key) {
+        currentDragOverTargetRef.current = targetKey;
+        setDragOverTarget(targetKey);
+        return;
+      }
+    }
+    currentDragOverTargetRef.current = null;
+    setDragOverTarget(null);
+  };
+
+  const handleItemTouchEnd = (e: React.TouchEvent) => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+
+    if (isTouchDraggingRef.current) {
+      if (e.cancelable) e.preventDefault();
+      suppressClickRef.current = true;
+      setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 250);
+
+      if (touchDraggedItemRef.current && currentDragOverTargetRef.current) {
+        executeDrop(
+          touchDraggedItemRef.current.type,
+          touchDraggedItemRef.current.key,
+          currentDragOverTargetRef.current
+        );
+      }
+    }
+
+    isTouchDraggingRef.current = false;
+    touchDraggedItemRef.current = null;
+    currentDragOverTargetRef.current = null;
+    touchStartPosRef.current = null;
+    setDraggedItem(null);
+    setDragOverTarget(null);
+  };
+
+  const getDragProps = (type: string, key: string, isDisabled: boolean = false) => {
+    if (isDisabled) return { dragClass: '', cursorStyle: {}, dragEvents: {} };
+    const isDragging = draggedItem?.type === type && draggedItem?.key === key;
+    const isTarget = dragOverTarget === key && draggedItem?.type === type && !isDragging;
+
+    return {
+      dragClass: `custom-btn-item ${isDragging ? 'dragging' : ''} ${isTarget ? 'drag-target' : ''}`,
+      cursorStyle: { cursor: 'grab' },
+      dragEvents: {
+        draggable: true,
+        'data-drag-type': type,
+        'data-drag-key': key,
+        onDragStart: (e: React.DragEvent) => {
+          setDraggedItem({ type, key });
+          e.dataTransfer.setData('text/plain', JSON.stringify({ type, key }));
+          e.dataTransfer.effectAllowed = 'move';
+        },
+        onDragOver: (e: React.DragEvent) => {
+          if (draggedItem?.type === type && draggedItem?.key !== key) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            setDragOverTarget(key);
+          }
+        },
+        onDragLeave: () => {
+          if (dragOverTarget === key) setDragOverTarget(null);
+        },
+        onDrop: (e: React.DragEvent) => {
+          e.preventDefault();
+          if (draggedItem?.type === type && draggedItem?.key !== key) {
+            executeDrop(type, draggedItem.key, key);
+          }
+          setDraggedItem(null);
+          setDragOverTarget(null);
+        },
+        onDragEnd: () => {
+          setDraggedItem(null);
+          setDragOverTarget(null);
+        },
+        onTouchStart: (e: React.TouchEvent) => handleItemTouchStart(type, key, e),
+        onTouchMove: handleItemTouchMove,
+        onTouchEnd: handleItemTouchEnd,
+      },
+    };
+  };
+
+  // 各グループへカスタムボタンを割り振って描画するヘルパー
+  const renderCustomButtonsForCategory = (
+    cat: CustomButtonCategory,
+    buttonStyle: React.CSSProperties,
+    gridColumns: string = 'repeat(4, 1fr)',
+    isDisabled: boolean = false
+  ) => {
+    const btns = displayedCustomButtons.filter(
+      (b) => (b.category || '部位') === cat && !b.isVoice && b.name !== '音声入力'
+    );
+    if (btns.length === 0) return null;
+
+    return (
+      <div
+        className="button-grid-3"
+        style={{
+          gridTemplateColumns: gridColumns,
+          gap: '6px',
+          marginTop: '6px',
+        }}
+      >
+        {btns.map((btnConfig) => {
+          const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
+          const baseName = btnConfig.name;
+          const isLocation = btnConfig.category === '場所';
+          const selectedIndex = currentCustomSelections.findIndex(
+            (item) =>
+              item === baseName ||
+              item.replace(/^[左右上下]/, '') === baseName ||
+              (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
+          );
+          const isSelected = selectedIndex !== -1;
+          const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
+
+          if (isVoice) {
+            return (
+              <button
+                key={btnConfig.id}
+                type="button"
+                className="btn"
+                onClick={() => setIsVoiceModalOpen(true)}
+                style={{
+                  ...buttonStyle,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                  borderColor: '#6366f1',
+                  borderWidth: '2px',
+                  color: '#3730a3',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                <Mic size={16} color="#4f46e5" />
+                <span>音声入力</span>
+              </button>
+            );
+          }
+
+          const { dragClass, cursorStyle, dragEvents } = getDragProps(`custom-${cat}`, btnConfig.id, isDisabled);
+
+          return (
+            <button
+              key={btnConfig.id}
+              type="button"
+              disabled={isDisabled}
+              className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+              onClick={() => {
+                if (suppressClickRef.current) return;
+                handleToggleCustomSelection(baseName);
+              }}
+              {...dragEvents}
+              style={{
+                ...buttonStyle,
+                position: 'relative',
+                cursor: isDisabled ? 'not-allowed' : 'grab',
+                opacity: isDisabled ? 0.5 : 1,
+                ...cursorStyle,
+              }}
+            >
+              {displayName}
+              {isSelected && selectedIndex !== -1 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '4px',
+                    fontSize: '0.65rem',
+                    backgroundColor: '#ffffff',
+                    color: '#000000',
+                    borderRadius: '50%',
+                    width: '18px',
+                    height: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid #222222',
+                    fontWeight: 'bold',
+                  }}
+                >
+                  {selectedIndex + 1}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <main className="main-content">
       {/* モード切替エリア & クリアボタン */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid var(--border-color)', paddingBottom: '10px', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>モード:</span>
-          <div style={{ display: 'flex', gap: '4px' }}>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {(['外部', '内部', '傾斜'] as SurveyType[]).map((m) => {
               const isSelected = currentMode === m;
               return (
@@ -791,6 +1177,29 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 </button>
               );
             })}
+
+            {/* モードボタン（外部/内部/傾斜）の隣に音声入力ボタンを配置 */}
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setIsVoiceModalOpen(true)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+                borderColor: '#6366f1',
+                borderWidth: '2px',
+                color: '#3730a3',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+              }}
+            >
+              <Mic size={14} color="#4f46e5" />
+              <span>音声入力</span>
+            </button>
           </div>
         </div>
         <button
@@ -882,178 +1291,15 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
       {isModeInternal ? (
         <>
-          {/* ① 内部用カスタムボタン選択エリア */}
-          <section
-            style={{
-              border: '2px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              backgroundColor: '#ffffff',
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 'bold',
-                fontSize: '0.95rem',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Box size={18} />
-                内部用カスタムボタン
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
-                ※長押し/ドラッグで並び替え可能
-              </span>
-            </div>
-
-            {customButtons.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: '#888', padding: '20px 0', textAlign: 'center' }}>
-                ボタンが登録されていません。下エリアから追加してください。
-              </p>
-            ) : (
-              <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {customButtons.map((btnConfig, idx) => {
-                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
-                  const baseName = btnConfig.name;
-                  const isLocation = btnConfig.category === '場所';
-                  const selectedIndex = currentCustomSelections.findIndex(
-                    (item) =>
-                      item === baseName ||
-                      item.replace(/^[左右上下]/, '') === baseName ||
-                      (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
-                  );
-                  const isSelected = selectedIndex !== -1;
-                  const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
-                  const isDraggingThis = draggedIdx === idx;
-
-                  if (isVoice) {
-                    return (
-                      <button
-                        key={btnConfig.id}
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
-                        onClick={() => setIsVoiceModalOpen(true)}
-                        style={{
-                          height: '52px',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          cursor: 'grab',
-                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-                          borderColor: '#6366f1',
-                          borderWidth: '2px',
-                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Mic size={16} color="#4f46e5" />
-                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
-                          <span
-                            className="category-badge"
-                            style={{
-                              backgroundColor: '#4f46e5',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '0.65rem',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            音声
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
-                          タップして音声入力
-                        </span>
-                      </button>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={btnConfig.id}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      className={`btn custom-btn-item ${isSelected ? 'selected' : ''} ${isDraggingThis ? 'dragging' : ''}`}
-                      onClick={() => handleToggleCustomSelection(baseName)}
-                      style={{
-                        height: '52px',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '2px',
-                        cursor: 'grab',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{displayName}</span>
-                        <span
-                          className={`category-badge ${btnConfig.category === '場所'
-                            ? 'category-location'
-                            : btnConfig.category === '階数'
-                              ? 'category-floor'
-                              : btnConfig.category === '部位'
-                                ? 'category-part'
-                                : 'category-damage'
-                            }`}
-                        >
-                          {btnConfig.category}
-                        </span>
-                      </div>
-
-                      {isSelected && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: '2px',
-                            right: '4px',
-                            fontSize: '0.65rem',
-                            backgroundColor: '#ffffff',
-                            color: '#000000',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid #222222',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {selectedIndex + 1}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
           {/* ① 内部用 階数グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
               borderRadius: '8px',
               padding: '10px 12px',
-              backgroundColor: '#ffffff',
+              backgroundColor: isFloorDisabled ? '#f0f0f0' : '#ffffff',
+              opacity: isFloorDisabled ? 0.5 : 1,
+              transition: 'all 0.2s ease',
             }}
           >
             <div
@@ -1068,6 +1314,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <Layers size={18} />
               ① 階数グループ
+              {isFloorDisabled && (
+                <span style={{ fontSize: '0.75rem', color: '#d9534f', marginLeft: 'auto' }}>
+                  ※ 塀・土間選択中のため無効
+                </span>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
@@ -1079,6 +1330,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor1Change(-1)}
+                    disabled={isFloorDisabled}
                     style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
                     <Minus size={14} />
@@ -1090,17 +1342,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      onChangeSelection({
-                        ...selection,
-                        location: { ...selection.location, floor1: val },
-                      });
+                      if (!isFloorDisabled) {
+                        onChangeSelection({
+                          ...selection,
+                          location: { ...selection.location, floor1: val },
+                        });
+                      }
                     }}
+                    disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
                   />
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor1Change(1)}
+                    disabled={isFloorDisabled}
                     style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
                     <Plus size={14} />
@@ -1116,6 +1372,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor2Change(-1)}
+                    disabled={isFloorDisabled}
                     style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
                     <Minus size={14} />
@@ -1127,17 +1384,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      onChangeSelection({
-                        ...selection,
-                        location: { ...selection.location, floor2: val },
-                      });
+                      if (!isFloorDisabled) {
+                        onChangeSelection({
+                          ...selection,
+                          location: { ...selection.location, floor2: val },
+                        });
+                      }
                     }}
+                    disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
                   />
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor2Change(1)}
+                    disabled={isFloorDisabled}
                     style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
                     <Plus size={14} />
@@ -1145,6 +1406,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* 階数カスタムボタン */}
+            {renderCustomButtonsForCategory('階数', { height: '38px', fontSize: '0.9rem', fontWeight: 'bold' }, 'repeat(4, 1fr)', isFloorDisabled)}
           </section>
 
           {/* ② 内部用 場所グループ */}
@@ -1171,19 +1435,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {LOCATION_OPTIONS.map((loc) => {
+              {locationOptions.map((loc) => {
                 const isSelected = activeLocation === loc;
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
                 return (
                   <button
                     key={loc}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleLocationToggle(loc)}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleLocationToggle(loc);
+                    }}
+                    {...dragEvents}
                     style={{
                       height: '48px',
                       fontSize: '0.95rem',
                       padding: '4px',
                       fontWeight: 'bold',
+                      ...cursorStyle,
                     }}
                   >
                     {loc}
@@ -1191,6 +1461,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 );
               })}
             </div>
+
+            {/* 場所カスタムボタン */}
+            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 内部用 方向グループ（東西南北） */}
@@ -1222,21 +1495,108 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              {DIRECTION_OPTIONS.map((dir) => {
+              {directionOptions.map((dir) => {
                 const isSelected = selection.directions.includes(dir);
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('direction', dir);
                 return (
                   <button
                     key={dir}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleDirectionToggle(dir)}
-                    style={{ height: '48px', fontSize: '1.05rem' }}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleDirectionToggle(dir);
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '1.05rem', ...cursorStyle }}
                   >
                     {dir}
                   </button>
                 );
               })}
             </div>
+          </section>
+
+          {/* ④ 内部用 部位グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Box size={18} />
+              ④ 部位グループ
+            </div>
+
+            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
+              <p style={{ fontSize: '0.85rem', color: '#888', margin: 0, padding: '8px 0', textAlign: 'center' }}>
+                部位ボタンが登録されていません。下エリアから追加してください。
+              </p>
+            )}
+          </section>
+
+          {/* ⑤ 内部用 損傷グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={18} />
+                ⑤ 損傷グループ
+              </span>
+            </div>
+
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+              {internalSituationOptions.map((btn) => {
+                const isSelected = selection.situationButton === btn;
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('internal-situation', btn);
+                return (
+                  <button
+                    key={btn}
+                    type="button"
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleSituationToggle(btn as '現況' | '全景');
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold', ...cursorStyle }}
+                  >
+                    {btn}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 損傷カスタムボタン */}
+            {renderCustomButtonsForCategory('損傷', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
           </section>
 
           {/* ② 選択された「損傷」タイプの詳細入力（W / L 数値 & 全般/多数 プリセット） */}
@@ -1505,24 +1865,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '現況' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('現況')}
-                style={{ height: '42px', fontSize: '0.95rem', padding: '0 12px', flexShrink: 0 }}
-              >
-                現況
-              </button>
-
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '全景' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('全景')}
-                style={{ height: '34px', fontSize: '0.8rem', padding: '0 8px', flexShrink: 0 }}
-              >
-                全景
-              </button>
-
               <input
                 type="text"
                 className="stepper-input"
@@ -1773,172 +2115,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
         </>
       ) : isModeInclination ? (
         <>
-          {/* ① 傾斜用カスタムボタン選択エリア */}
-          <section
-            style={{
-              border: '2px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              backgroundColor: '#ffffff',
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 'bold',
-                fontSize: '0.95rem',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Box size={18} />
-                傾斜用カスタムボタン
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
-                ※場所ボタンは内外共通
-              </span>
-            </div>
-
-            {displayedCustomButtons.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: '#888', padding: '20px 0', textAlign: 'center' }}>
-                ボタンが登録されていません。下エリアから追加してください。
-              </p>
-            ) : (
-              <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {displayedCustomButtons.map((btnConfig, idx) => {
-                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
-                  const baseName = btnConfig.name;
-                  const isLocation = btnConfig.category === '場所';
-                  const selectedIndex = currentCustomSelections.findIndex(
-                    (item) =>
-                      item === baseName ||
-                      item.replace(/^[左右上下]/, '') === baseName ||
-                      (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
-                  );
-                  const isSelected = selectedIndex !== -1;
-                  const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
-                  const isDraggingThis = draggedIdx === idx;
-
-                  if (isVoice) {
-                    return (
-                      <button
-                        key={btnConfig.id}
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
-                        onClick={() => setIsVoiceModalOpen(true)}
-                        style={{
-                          height: '52px',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          cursor: 'grab',
-                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-                          borderColor: '#6366f1',
-                          borderWidth: '2px',
-                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Mic size={16} color="#4f46e5" />
-                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
-                          <span
-                            className="category-badge"
-                            style={{
-                              backgroundColor: '#4f46e5',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '0.65rem',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            音声
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
-                          タップして音声入力
-                        </span>
-                      </button>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={btnConfig.id}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      className={`btn custom-btn-item ${isSelected ? 'selected' : ''} ${isDraggingThis ? 'dragging' : ''}`}
-                      onClick={() => handleToggleCustomSelection(baseName)}
-                      style={{
-                        height: '52px',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '2px',
-                        cursor: 'grab',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{displayName}</span>
-                        <span
-                          className={`category-badge ${
-                            btnConfig.category === '場所'
-                              ? 'category-location'
-                              : btnConfig.category === '階数'
-                                ? 'category-floor'
-                                : btnConfig.category === '部位'
-                                  ? 'category-part'
-                                  : 'category-damage'
-                          }`}
-                        >
-                          {btnConfig.category}
-                        </span>
-                      </div>
-
-                      {isSelected && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: '2px',
-                            right: '4px',
-                            fontSize: '0.65rem',
-                            backgroundColor: '#ffffff',
-                            color: '#000000',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid #222222',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {selectedIndex + 1}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
           {/* ① 傾斜用 階数グループ */}
           <section
             style={{
@@ -2012,6 +2188,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* 階数カスタムボタン */}
+            {renderCustomButtonsForCategory('階数', { height: '38px', fontSize: '0.9rem', fontWeight: 'bold' }, 'repeat(4, 1fr)', isFloorDisabled)}
           </section>
 
           {/* ② 傾斜用 場所グループ */}
@@ -2038,19 +2217,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {LOCATION_OPTIONS.map((loc) => {
+              {locationOptions.map((loc) => {
                 const isSelected = activeLocation === loc;
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
                 return (
                   <button
                     key={loc}
                     type="button"
                     className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleLocationToggle(loc)}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleLocationToggle(loc);
+                    }}
+                    {...dragEvents}
                     style={{
                       height: '48px',
                       fontSize: '0.95rem',
                       padding: '4px',
                       fontWeight: 'bold',
+                      ...cursorStyle,
                     }}
                   >
                     {loc}
@@ -2058,6 +2243,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 );
               })}
             </div>
+
+            {/* 場所カスタムボタン */}
+            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 傾斜用 方向グループ */}
@@ -2089,21 +2277,56 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              {DIRECTION_OPTIONS.map((dir) => {
+              {directionOptions.map((dir) => {
                 const isSelected = selection.directions.includes(dir);
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('direction', dir);
                 return (
                   <button
                     key={dir}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleDirectionToggle(dir)}
-                    style={{ height: '48px', fontSize: '1.05rem' }}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleDirectionToggle(dir);
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '1.05rem', ...cursorStyle }}
                   >
                     {dir}
                   </button>
                 );
               })}
             </div>
+          </section>
+
+          {/* ④ 傾斜用 部位グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Box size={18} />
+              ④ 部位グループ
+            </div>
+
+            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)') || (
+              <p style={{ fontSize: '0.85rem', color: '#888', margin: 0, padding: '8px 0', textAlign: 'center' }}>
+                部位ボタンが登録されていません。下エリアから追加してください。
+              </p>
+            )}
           </section>
 
           {/* ④ 傾斜数値入力セクション（数値1 / 数値2） */}
@@ -2437,171 +2660,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
         </>
       ) : (
         <>
-          {/* 外部用カスタムボタン */}
-          <section
-            style={{
-              border: '2px solid var(--border-color)',
-              borderRadius: '8px',
-              padding: '10px 12px',
-              backgroundColor: '#ffffff',
-            }}
-          >
-            <div
-              style={{
-                fontWeight: 'bold',
-                fontSize: '0.95rem',
-                marginBottom: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Box size={18} />
-                外部用カスタムボタン
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
-                ※長押し/ドラッグで並び替え可能
-              </span>
-            </div>
-
-            {customButtons.length === 0 ? (
-              <p style={{ fontSize: '0.85rem', color: '#888', padding: '20px 0', textAlign: 'center' }}>
-                ボタンが登録されていません。下エリアから追加してください。
-              </p>
-            ) : (
-              <div className="button-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {customButtons.map((btnConfig, idx) => {
-                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
-                  const baseName = btnConfig.name;
-                  const isLocation = btnConfig.category === '場所';
-                  const selectedIndex = currentCustomSelections.findIndex(
-                    (item) =>
-                      item === baseName ||
-                      item.replace(/^[左右上下]/, '') === baseName ||
-                      (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
-                  );
-                  const isSelected = selectedIndex !== -1;
-                  const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
-                  const isDraggingThis = draggedIdx === idx;
-
-                  if (isVoice) {
-                    return (
-                      <button
-                        key={btnConfig.id}
-                        type="button"
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        className={`btn custom-btn-item custom-btn-voice ${isDraggingThis ? 'dragging' : ''}`}
-                        onClick={() => setIsVoiceModalOpen(true)}
-                        style={{
-                          height: '52px',
-                          position: 'relative',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '2px',
-                          cursor: 'grab',
-                          background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
-                          borderColor: '#6366f1',
-                          borderWidth: '2px',
-                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Mic size={16} color="#4f46e5" />
-                          <span style={{ fontSize: '0.9rem', fontWeight: 'bold', color: '#3730a3' }}>音声入力</span>
-                          <span
-                            className="category-badge"
-                            style={{
-                              backgroundColor: '#4f46e5',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '0.65rem',
-                              padding: '1px 5px',
-                              borderRadius: '4px',
-                              fontWeight: 'bold',
-                            }}
-                          >
-                            音声
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.65rem', color: '#6366f1', fontWeight: '600' }}>
-                          タップして音声入力
-                        </span>
-                      </button>
-                    );
-                  }
-
-                  return (
-                    <button
-                      key={btnConfig.id}
-                      type="button"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      className={`btn custom-btn-item ${isSelected ? 'selected' : ''} ${isDraggingThis ? 'dragging' : ''}`}
-                      onClick={() => handleToggleCustomSelection(baseName)}
-                      style={{
-                        height: '52px',
-                        position: 'relative',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '2px',
-                        cursor: 'grab',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{displayName}</span>
-                        <span
-                          className={`category-badge ${btnConfig.category === '場所'
-                            ? 'category-location'
-                            : btnConfig.category === '階数'
-                              ? 'category-floor'
-                              : btnConfig.category === '部位'
-                                ? 'category-part'
-                                : 'category-damage'
-                            }`}
-                        >
-                          {btnConfig.category}
-                        </span>
-                      </div>
-
-                      {isSelected && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            top: '2px',
-                            right: '4px',
-                            fontSize: '0.65rem',
-                            backgroundColor: '#ffffff',
-                            color: '#000000',
-                            borderRadius: '50%',
-                            width: '18px',
-                            height: '18px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            border: '1px solid #222222',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {selectedIndex + 1}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
           {/* サブタイトル */}
           <div className="survey-title">
             <span style={{ fontSize: '0.95rem' }}>ボタン選択（①階数 ②場所 ③方向 ④部位 ⑤損傷 ⑥状況）</span>
@@ -2722,6 +2780,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* 階数カスタムボタン */}
+            {renderCustomButtonsForCategory('階数', { height: '38px', fontSize: '0.9rem', fontWeight: 'bold' }, 'repeat(4, 1fr)', isFloorDisabled)}
           </section>
 
           {/* ② 場所グループ */}
@@ -2753,19 +2814,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
-              {LOCATION_OPTIONS.map((loc) => {
+              {locationOptions.map((loc) => {
                 const isSelected = activeLocation === loc;
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('location', loc);
                 return (
                   <button
                     key={loc}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleLocationToggle(loc)}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleLocationToggle(loc);
+                    }}
+                    {...dragEvents}
                     style={{
                       height: '48px',
                       fontSize: '0.95rem',
                       padding: '4px',
                       fontWeight: 'bold',
+                      ...cursorStyle,
                     }}
                   >
                     {loc}
@@ -2773,6 +2840,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 );
               })}
             </div>
+
+            {/* 場所カスタムボタン */}
+            {renderCustomButtonsForCategory('場所', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
           </section>
 
           {/* ③ 方向グループ */}
@@ -2803,15 +2873,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-              {DIRECTION_OPTIONS.map((dir) => {
+              {directionOptions.map((dir) => {
                 const isSelected = selection.directions.includes(dir);
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('direction', dir);
                 return (
                   <button
                     key={dir}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleDirectionToggle(dir)}
-                    style={{ height: '48px', fontSize: '1.05rem' }}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleDirectionToggle(dir);
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '1.05rem', ...cursorStyle }}
                   >
                     {dir}
                   </button>
@@ -2848,21 +2923,29 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-              {PART_OPTIONS.map((part) => {
+              {partOptions.map((part) => {
                 const isSelected = selection.part === part;
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('part', part);
                 return (
                   <button
                     key={part}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handlePartToggle(part)}
-                    style={{ height: '48px', fontSize: '0.95rem', padding: '4px' }}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handlePartToggle(part);
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '0.95rem', padding: '4px', ...cursorStyle }}
                   >
                     {part}
                   </button>
                 );
               })}
             </div>
+
+            {/* 部位カスタムボタン */}
+            {renderCustomButtonsForCategory('部位', { height: '48px', fontSize: '0.95rem', padding: '4px' }, 'repeat(4, 1fr)')}
           </section>
 
           {/* ⑤ 損傷グループ */}
@@ -2895,18 +2978,27 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
 
             <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-              {/* 左上: 現況 */}
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '現況' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('現況')}
-                style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold' }}
-              >
-                現況
-              </button>
+              {damageOptions.map((dmg) => {
+                const { dragClass, cursorStyle, dragEvents } = getDragProps('damage', dmg);
+                if (dmg === '現況' || dmg === '全景') {
+                  const isSelected = selection.situationButton === dmg;
+                  return (
+                    <button
+                      key={dmg}
+                      type="button"
+                      className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                      onClick={() => {
+                        if (suppressClickRef.current) return;
+                        handleSituationToggle(dmg as '現況' | '全景');
+                      }}
+                      {...dragEvents}
+                      style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold', ...cursorStyle }}
+                    >
+                      {dmg}
+                    </button>
+                  );
+                }
 
-              {/* 損傷 1〜4: 亀裂, 隙間, HC, 欠落 */}
-              {DAMAGE_OPTIONS.slice(0, 4).map((dmg) => {
                 const isSelected = (selection.damages || []).some(
                   (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg
                 );
@@ -2914,43 +3006,22 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   <button
                     key={dmg}
                     type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleDamageToggle(dmg)}
-                    style={{ height: '48px', fontSize: '1rem' }}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleDamageToggle(dmg);
+                    }}
+                    {...dragEvents}
+                    style={{ height: '48px', fontSize: '1rem', ...cursorStyle }}
                   >
                     {dmg}
                   </button>
                 );
               })}
-
-              {/* 損傷 5〜8: 目地切, 剥離, 割れ, ズレ */}
-              {DAMAGE_OPTIONS.slice(4, 8).map((dmg) => {
-                const isSelected = (selection.damages || []).some(
-                  (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg
-                );
-                return (
-                  <button
-                    key={dmg}
-                    type="button"
-                    className={`btn ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleDamageToggle(dmg)}
-                    style={{ height: '48px', fontSize: '1rem' }}
-                  >
-                    {dmg}
-                  </button>
-                );
-              })}
-
-              {/* 右下: 全景 */}
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '全景' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('全景')}
-                style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold' }}
-              >
-                全景
-              </button>
             </div>
+
+            {/* 損傷カスタムボタン */}
+            {renderCustomButtonsForCategory('損傷', { height: '48px', fontSize: '1rem' }, 'repeat(5, 1fr)')}
 
             {/* 選択された損傷の数値入力フォーム (数値W, 数値L / 全般, 多数) */}
             {selection.damages && selection.damages.length > 0 && (

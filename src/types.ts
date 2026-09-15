@@ -1,8 +1,10 @@
 export type SurveyType = '外部' | '内部' | '傾斜';
 
 export interface BasicInfo {
+  projectNumber?: string; // 工番（未入力可）
   houseNumber: number;
   surveyType: SurveyType;
+  surveyNumber?: string; // 調査番号（①～④）
   investigator: string;
   folderNumber: number;
 }
@@ -11,7 +13,8 @@ export interface BasicInfo {
  * ① 場所グループデータ
  */
 export interface LocationData {
-  isBuilding: boolean; // 「建物」ボタン (デフォルト false)
+  isBuilding: boolean; // 「建物」ボタン (互換性用)
+  selectedLocation?: string | null; // 選択された場所名: '建物' | '外構' | '土間' | '塀' | '植込' | '擁壁' | null
   floor1: number;      // 階数① (0 = 未入力)
   floor2: number;      // 階数② (0 = 未入力)
 }
@@ -46,7 +49,7 @@ export interface VoiceInputItem {
 export interface LineSelection {
   location: LocationData;
   directions: string[];   // 方向: 最大2つ
-  part: string | null;     // 部位: 単一選択 ('壁' | '腰' | '軒' | '塀' | '土間')
+  part: string | null;     // 部位: 単一選択 ('壁' | '腰' | '軒' | '屋根')
   damages: DamageItem[];   // 損傷: 最大2つ、各数値(W/L)保持
   situationButton?: '全景' | '現況' | null; // 状況ボタン選択
   situationText?: string;                  // 状況テキスト入力

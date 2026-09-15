@@ -41,14 +41,25 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   const [text, setText] = useState('');
   const [category, setCategory] = useState<CustomButtonCategory>(defaultCategory);
   const [isListening, setIsListening] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const isListeningRef = useRef(false);
+  const isStartingRef = useRef(false);
+  const isOpenRef = useRef(isOpen);
   const textRef = useRef('');
   const categoryRef = useRef<CustomButtonCategory>(defaultCategory);
   const isRegisteredRef = useRef(false);
+  const restartTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const restartCountRef = useRef(0);
+  const lastRestartTimeRef = useRef(0);
+  const baseTranscriptRef = useRef('');
+
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   useEffect(() => {
     isListeningRef.current = isListening;
@@ -63,15 +74,22 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   }, [category]);
 
   const stopRecognition = () => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
     isListeningRef.current = false;
+    isStartingRef.current = false;
+    restartCountRef.current = 0;
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
+        recognitionRef.current.abort();
       } catch (e) {
         // ignore
       }
       recognitionRef.current = null;
     }
+    setIsStarting(false);
     setIsListening(false);
   };
 
@@ -114,23 +132,9 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
     }
   };
 
-  // モーダルオープン時の初期化・音声認識開始
-  useEffect(() => {
-    if (!isOpen) {
-      stopRecognition();
-      setText('');
-      textRef.current = '';
-      setErrorMessage(null);
-      isRegisteredRef.current = false;
-      return;
-    }
-
-    setCategory(defaultCategory);
-    categoryRef.current = defaultCategory;
-    setText('');
-    textRef.current = '';
-    setErrorMessage(null);
-    isRegisteredRef.current = false;
+  const startRecognition = (isAutoRestart = false) => {
+    if (isStartingRef.current && !isAutoRestart) return;
+    if (isRegisteredRef.current || !isOpenRef.current) return;
 
     const win = window as unknown as IWindow;
     const SpeechRecognitionAPI = win.SpeechRecognition || win.webkitSpeechRecognition;
@@ -143,15 +147,38 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
 
     setIsSupported(true);
 
+    if (isAutoRestart) {
+      baseTranscriptRef.current = textRef.current.trim();
+    } else {
+      baseTranscriptRef.current = '';
+    }
+
+    // 既存の認識インスタンスを停止
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // ignore
+      }
+      recognitionRef.current = null;
+    }
+
     try {
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = 'ja-JP';
-      recognition.continuous = true;
+
+      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1));
+      // iOS Safari は continuous: true だとダイアログ表示時や無音時にバッファ競合でフリーズ・終了しやすいため単発モードにする
+      recognition.continuous = !isIOS;
       recognition.interimResults = true;
 
       recognition.onstart = () => {
+        isStartingRef.current = false;
+        setIsStarting(false);
+        isListeningRef.current = true;
         setIsListening(true);
         setErrorMessage(null);
+        restartCountRef.current = 0;
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -167,44 +194,117 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
           }
         }
 
-        const combined = (finalTranscript + interimTranscript).trim();
-        if (combined) {
-          processVoiceResult(combined);
+        const sessionText = (finalTranscript + interimTranscript).trim();
+        if (sessionText) {
+          const fullText = baseTranscriptRef.current
+            ? `${baseTranscriptRef.current} ${sessionText}`
+            : sessionText;
+          processVoiceResult(fullText);
         }
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         console.warn('SpeechRecognition error:', event.error);
+        isStartingRef.current = false;
+        setIsStarting(false);
+
+        // エラー発生時は直ちにフラグを同期的にリセットし、onend での再起動ループを防止する
         if (event.error === 'not-allowed') {
-          setErrorMessage('マイクへのアクセスが許可されていません。ブラウザ設定でマイクを許可してください。');
+          isListeningRef.current = false;
           setIsListening(false);
+          setErrorMessage('マイクへのアクセスが許可されていません。ブラウザ設定でマイクを許可してください。');
         } else if (event.error === 'no-speech') {
-          // 音声未検出
+          // 音声未検出時はユーザー停止ではないためリスニング状態は維持（onend側で安全に再開）
+        } else if (event.error === 'aborted') {
+          // 中断時は停止
+          isListeningRef.current = false;
+          setIsListening(false);
         } else {
+          isListeningRef.current = false;
+          setIsListening(false);
           setErrorMessage(`音声認識エラー: ${event.error}`);
         }
       };
 
       recognition.onend = () => {
-        if (isRegisteredRef.current) return;
-        if (isListeningRef.current) {
-          try {
-            recognition.start();
-          } catch (e) {
-            setIsListening(false);
-          }
-        } else {
+        isStartingRef.current = false;
+        setIsStarting(false);
+
+        if (isRegisteredRef.current || !isOpenRef.current) {
+          isListeningRef.current = false;
           setIsListening(false);
+          return;
         }
+
+        // リスニング中でない場合（エラー時や一時停止時）は再起動しない
+        if (!isListeningRef.current) {
+          setIsListening(false);
+          return;
+        }
+
+        // 短時間に連続して onend が呼ばれる暴走ループを検知して停止する
+        const now = Date.now();
+        if (now - lastRestartTimeRef.current < 2000) {
+          restartCountRef.current += 1;
+        } else {
+          restartCountRef.current = 1;
+        }
+        lastRestartTimeRef.current = now;
+
+        if (restartCountRef.current > 4) {
+          console.warn('SpeechRecognition: 短時間での連続再起動を検知したため一時停止しました');
+          stopRecognition();
+          return;
+        }
+
+        // 300ms の安全ディレイを挟んで再開（メインスレッドのブロックを防止）
+        if (restartTimerRef.current) {
+          clearTimeout(restartTimerRef.current);
+        }
+        restartTimerRef.current = setTimeout(() => {
+          if (isOpenRef.current && isListeningRef.current && !isRegisteredRef.current) {
+            startRecognition(true);
+          }
+        }, 300);
       };
 
       recognitionRef.current = recognition;
+      isStartingRef.current = true;
+      setIsStarting(true);
+      // 注意: recognition.start() 直後には isListening を true にせず、onstart で設定する
       recognition.start();
-      setIsListening(true);
     } catch (e) {
       console.error('Failed to start speech recognition', e);
+      isStartingRef.current = false;
+      isListeningRef.current = false;
+      setIsStarting(false);
       setIsListening(false);
     }
+  };
+
+  // モーダルオープン時の初期化・音声認識開始
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+    if (!isOpen) {
+      stopRecognition();
+      setText('');
+      textRef.current = '';
+      setErrorMessage(null);
+      isRegisteredRef.current = false;
+      baseTranscriptRef.current = '';
+      return;
+    }
+
+    setCategory(defaultCategory);
+    categoryRef.current = defaultCategory;
+    setText('');
+    textRef.current = '';
+    setErrorMessage(null);
+    isRegisteredRef.current = false;
+    baseTranscriptRef.current = '';
+
+    isListeningRef.current = true;
+    startRecognition(false);
 
     return () => {
       stopRecognition();
@@ -212,76 +312,18 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
   }, [isOpen]);
 
   const toggleListening = () => {
-    if (isListening) {
+    if (isListening || isStarting) {
       stopRecognition();
     } else {
-      const win = window as unknown as IWindow;
-      const SpeechRecognitionAPI = win.SpeechRecognition || win.webkitSpeechRecognition;
-      if (!SpeechRecognitionAPI) return;
-
-      try {
-        const recognition = new SpeechRecognitionAPI();
-        recognition.lang = 'ja-JP';
-        recognition.continuous = true;
-        recognition.interimResults = true;
-
-        recognition.onstart = () => {
-          setIsListening(true);
-          setErrorMessage(null);
-        };
-
-        recognition.onresult = (event: SpeechRecognitionEvent) => {
-          let interimTranscript = '';
-          let finalTranscript = '';
-
-          for (let i = 0; i < event.results.length; ++i) {
-            const result = event.results[i];
-            if (result.isFinal) {
-              finalTranscript += result[0].transcript;
-            } else {
-              interimTranscript += result[0].transcript;
-            }
-          }
-
-          const combined = (finalTranscript + interimTranscript).trim();
-          if (combined) {
-            processVoiceResult(combined);
-          }
-        };
-
-        recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-          if (event.error === 'not-allowed') {
-            setErrorMessage('マイクへのアクセスが許可されていません。ブラウザ設定でマイクを許可してください。');
-          }
-          setIsListening(false);
-        };
-
-        recognition.onend = () => {
-          if (isRegisteredRef.current) return;
-          if (isListeningRef.current) {
-            try {
-              recognition.start();
-            } catch (e) {
-              setIsListening(false);
-            }
-          } else {
-            setIsListening(false);
-          }
-        };
-
-        recognitionRef.current = recognition;
-        isListeningRef.current = true;
-        recognition.start();
-        setIsListening(true);
-      } catch (e) {
-        console.error('Failed to restart speech recognition', e);
-      }
+      isListeningRef.current = true;
+      startRecognition(false);
     }
   };
 
   const handleClear = () => {
     setText('');
     textRef.current = '';
+    baseTranscriptRef.current = '';
   };
 
   const handleRegister = () => {
@@ -327,12 +369,12 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* 音声認識ステータス / マイクコントロール */}
           <div
-            className={`voice-status-box ${isListening ? 'listening' : 'paused'}`}
+            className={`voice-status-box ${isListening ? 'listening' : isStarting ? 'starting' : 'paused'}`}
             style={{
               padding: '10px 12px',
               borderRadius: '10px',
-              border: `2px solid ${isListening ? '#818cf8' : '#e2e8f0'}`,
-              backgroundColor: isListening ? '#f5f3ff' : '#f8fafc',
+              border: `2px solid ${isListening ? '#818cf8' : isStarting ? '#a5b4fc' : '#e2e8f0'}`,
+              backgroundColor: isListening ? '#f5f3ff' : isStarting ? '#fbfbfe' : '#f8fafc',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -341,15 +383,15 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              <div className={`voice-pulse-circle ${isListening ? 'active' : ''}`} style={{ flexShrink: 0 }}>
+              <div className={`voice-pulse-circle ${isListening ? 'active' : isStarting ? 'starting' : ''}`} style={{ flexShrink: 0 }}>
                 {isListening ? <Mic size={18} color="#ffffff" /> : <MicOff size={18} color="#94a3b8" />}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                <span style={{ fontWeight: 'bold', fontSize: '0.88rem', color: isListening ? '#4338ca' : '#64748b', whiteSpace: 'nowrap' }}>
-                  {isListening ? '音声を聞き取り中...' : '音声入力を一時停止中'}
+                <span style={{ fontWeight: 'bold', fontSize: '0.88rem', color: isListening ? '#4338ca' : isStarting ? '#4f46e5' : '#64748b', whiteSpace: 'nowrap' }}>
+                  {isListening ? '音声を聞き取り中...' : isStarting ? 'マイクを起動中...' : '音声入力を一時停止中'}
                 </span>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', whiteSpace: 'nowrap' }}>
-                  {isListening ? 'マイクに向かって話してください' : 'タップして聞き取りを再開'}
+                  {isListening ? 'マイクに向かって話してください' : isStarting ? 'マイクの許可を確認しています...' : 'タップして聞き取りを再開'}
                 </span>
               </div>
             </div>
@@ -371,7 +413,7 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
                   whiteSpace: 'nowrap',
                 }}
               >
-                {isListening ? '一時停止' : '再開'}
+                {isListening ? '一時停止' : isStarting ? '起動中...' : '再開'}
               </button>
             )}
           </div>
@@ -482,7 +524,10 @@ export const VoiceInputModal: React.FC<VoiceInputModalProps> = ({
             <textarea
               rows={3}
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                baseTranscriptRef.current = '';
+              }}
               placeholder="音声がここにテキスト化されます。キーボードで修正・追加入力も可能です。"
               style={{
                 width: '100%',

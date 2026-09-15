@@ -25,6 +25,17 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handleProjectNumberChange = (delta: number) => {
+    setFormData((prev) => {
+      const currentVal = parseInt(prev.projectNumber || '0', 10);
+      const nextVal = isNaN(currentVal) ? (delta > 0 ? 1 : 0) : Math.max(0, currentVal + delta);
+      return {
+        ...prev,
+        projectNumber: nextVal === 0 ? '' : String(nextVal),
+      };
+    });
+  };
+
   const handleHouseNumberChange = (delta: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -43,6 +54,13 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
     setFormData((prev) => ({
       ...prev,
       surveyType: type,
+    }));
+  };
+
+  const handleSurveyNumberChange = (num: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      surveyNumber: prev.surveyNumber === num ? '' : num,
     }));
   };
 
@@ -70,6 +88,39 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="modal-body">
+          {/* 工番 */}
+          <div className="form-group">
+            <label className="form-label">工番</label>
+            <div className="number-stepper">
+              <button
+                type="button"
+                className="stepper-btn"
+                onClick={() => handleProjectNumberChange(-1)}
+              >
+                <Minus size={20} />
+              </button>
+              <input
+                type="text"
+                className="stepper-input"
+                value={formData.projectNumber || ''}
+                placeholder="（未入力）"
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    projectNumber: e.target.value,
+                  })
+                }
+              />
+              <button
+                type="button"
+                className="stepper-btn"
+                onClick={() => handleProjectNumberChange(1)}
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+          </div>
+
           {/* 家屋番号 */}
           <div className="form-group">
             <label className="form-label">家屋番号</label>
@@ -117,6 +168,25 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
                   onClick={() => handleSurveyTypeChange(type)}
                 >
                   {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 調査番号 */}
+          <div className="form-group">
+            <label className="form-label">調査番号</label>
+            <div className="survey-toggle-group">
+              {['①', '②', '③', '④'].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  className={`toggle-btn ${
+                    formData.surveyNumber === num ? 'selected' : ''
+                  }`}
+                  onClick={() => handleSurveyNumberChange(num)}
+                >
+                  {num}
                 </button>
               ))}
             </div>

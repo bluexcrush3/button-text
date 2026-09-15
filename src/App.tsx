@@ -6,6 +6,7 @@ import { BasicInfoModal } from './components/BasicInfoModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { AllTextModal } from './components/AllTextModal';
 import { AllTextPreviewPanel } from './components/AllTextPreviewPanel';
+import { getTabName } from './utils/tabUtils';
 
 const STORAGE_KEY_TABS = 'btn_text_gen_tabs_v4';
 const STORAGE_KEY_ACTIVE = 'btn_text_gen_active_v4';
@@ -67,6 +68,7 @@ const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelecti
   mode: defaultMode,
   location: {
     isBuilding: false, // デフォルト未選択
+    selectedLocation: null,
     floor1: 0,        // デフォルト未選択 (0)
     floor2: 0,
   },
@@ -94,8 +96,10 @@ const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData 
   return {
     id,
     basicInfo: basicInfo || {
+      projectNumber: '',
       houseNumber: 1,
       surveyType: '外部',
+      surveyNumber: '①',
       investigator: '山本',
       folderNumber: 100,
     },
@@ -268,8 +272,10 @@ export const App: React.FC = () => {
     } else {
       const maxHouseNum = Math.max(...tabs.map((t) => t.basicInfo.houseNumber), 0);
       newBasicInfo = {
+        projectNumber: activeTab?.basicInfo.projectNumber || '',
         houseNumber: maxHouseNum + 1,
         surveyType: '外部',
+        surveyNumber: activeTab?.basicInfo.surveyNumber || '①',
         investigator: activeTab?.basicInfo.investigator || '山本',
         folderNumber: 100,
       };
@@ -545,7 +551,7 @@ export const App: React.FC = () => {
         title="全削除の確認"
         message={
           tabs.length > 1
-            ? `現在のタブ「家屋${activeTab?.basicInfo.houseNumber}」を削除します。よろしいですか？`
+            ? `現在のタブ「${activeTab ? getTabName(activeTab, tabs) : ''}」を削除します。よろしいですか？`
             : '現在の入力情報（生成文字列および全行データ）をすべて削除します。よろしいですか？'
         }
         confirmText="全削除を実行"

@@ -1,7 +1,7 @@
 import React from 'react';
-import { TabData, LineSelection } from '../types';
-import { getTabName } from '../utils/tabUtils';
+import { TabData, LineSelection, SurveyType, CustomButtonConfig } from '../types';
 import { generateLineText, CustomButtonsInput } from '../utils/textGenerator';
+import { getTabNameInfo } from '../utils/tabUtils';
 import { Settings, Trash2, Plus, ChevronLeft, ChevronRight, Eye, Copy, X } from 'lucide-react';
 import { VoiceDamageWButton } from './VoiceDamageWButton';
 import { VoiceInclinationButton } from './VoiceInclinationButton';
@@ -61,17 +61,31 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="tab-list-container">
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
-            const title = getTabName(tab, tabs);
+            const tabInfo = getTabNameInfo(tab, tabs);
+            const surveyType = tab.basicInfo.surveyType || '外部';
+            const typeClass =
+              surveyType === '内部'
+                ? 'type-internal'
+                : surveyType === '傾斜'
+                ? 'type-inclination'
+                : 'type-external';
             return (
               <button
                 key={tab.id}
-                className={`tab-item ${isActive ? 'active' : ''}`}
+                className={`tab-item ${typeClass} ${isActive ? 'active' : ''} ${tabInfo.projectNumber ? 'has-project-no' : ''}`}
                 onClick={() => onSelectTab(tab.id)}
+                title={`${tabInfo.fullText} (${surveyType})`}
               >
-                {title}
+                {tabInfo.projectNumber && (
+                  <span className="tab-project-no">{tabInfo.projectNumber}</span>
+                )}
+                <span className="tab-main-title">{tabInfo.mainTitle}</span>
               </button>
             );
           })}
+        </div>
+
+        <div className="header-actions-right">
           <button
             type="button"
             className="add-tab-btn"
@@ -80,21 +94,21 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Plus size={18} />
           </button>
-        </div>
-
-        <div className="header-actions-right">
-          <button type="button" className="btn-info" onClick={onOpenBasicInfo}>
-            <Settings size={14} />
-            基本情報
+          <button
+            type="button"
+            className="btn-info"
+            onClick={onOpenBasicInfo}
+            title="基本情報設定"
+          >
+            <Settings size={18} />
           </button>
           <button
             type="button"
             className="btn-danger btn-delete-all"
             onClick={onDeleteAllClick}
-            title="対象タブ削除・情報削除"
+            title="対象タブ削除・全情報削除"
           >
-            <Trash2 size={14} />
-            全削除
+            <Trash2 size={18} />
           </button>
         </div>
       </div>
@@ -148,7 +162,8 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="header-row-3">
           <div className="status-badges-group">
             <div className="status-badge" style={{ fontWeight: 'bold' }}>
-              #{activeTab.basicInfo.houseNumber} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
+              {activeTab.basicInfo.projectNumber ? `[${activeTab.basicInfo.projectNumber}] ` : ''}
+              家屋{String(activeTab.basicInfo.houseNumber).padStart(2, '0')}{activeTab.basicInfo.surveyNumber || ''} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
             </div>
           </div>
 

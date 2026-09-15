@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
-import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic } from 'lucide-react';
+import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers } from 'lucide-react';
 import { VoiceInputModal } from './VoiceInputModal';
 
 interface MainAreaProps {
@@ -29,22 +29,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
   onChangeInclinationCustomButtons,
 }) => {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
-  const isLocationDisabled = selection.part === '塀' || selection.part === '土間';
+  const activeLocation =
+    selection.location.selectedLocation ?? (selection.location.isBuilding ? '建物' : null);
+  const isFloorDisabled = activeLocation === '塀' || activeLocation === '土間';
 
-  // ① 場所グループハンドラー
-  const handleToggleBuilding = () => {
-    if (isLocationDisabled) return;
+  // ② 場所グループハンドラー（1つのみ選択）
+  const handleLocationToggle = (locName: string) => {
+    const nextLoc = activeLocation === locName ? null : locName;
     onChangeSelection({
       ...selection,
       location: {
         ...selection.location,
-        isBuilding: !selection.location.isBuilding,
+        selectedLocation: nextLoc,
+        isBuilding: nextLoc === '建物',
       },
     });
   };
 
   const handleFloor1Change = (delta: number) => {
-    if (isLocationDisabled) return;
+    if (isFloorDisabled) return;
     const newVal = Math.max(0, selection.location.floor1 + delta);
     onChangeSelection({
       ...selection,
@@ -56,7 +59,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
   };
 
   const handleFloor2Change = (delta: number) => {
-    if (isLocationDisabled) return;
+    if (isFloorDisabled) return;
     const newVal = Math.max(0, selection.location.floor2 + delta);
     onChangeSelection({
       ...selection,
@@ -757,8 +760,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
     setDraggedIdx(null);
   };
 
+  const LOCATION_OPTIONS = ['建物', '外構', '土間', '塀', '植込', '擁壁'];
   const DIRECTION_OPTIONS = ['北', '西', '南', '東'];
-  const PART_OPTIONS = ['壁', '腰', '軒', '屋根', '塀', '土間'];
+  const PART_OPTIONS = ['壁', '腰', '軒', '屋根'];
   const DAMAGE_OPTIONS = ['亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ'];
 
   return (
@@ -1043,7 +1047,107 @@ export const MainArea: React.FC<MainAreaProps> = ({
             )}
           </section>
 
-          {/* 内部用 場所グループ (建物ボタンと階数ボタンを横一列に配置) */}
+          {/* ① 内部用 階数グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Layers size={18} />
+              ① 階数グループ
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+              {/* 階数① */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
+                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(-1)}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    className="stepper-input"
+                    value={selection.location.floor1 || ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                      onChangeSelection({
+                        ...selection,
+                        location: { ...selection.location, floor1: val },
+                      });
+                    }}
+                    style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(1)}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+
+              {/* 階数② */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階②</span>
+                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor2Change(-1)}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    className="stepper-input"
+                    value={selection.location.floor2 || ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                      onChangeSelection({
+                        ...selection,
+                        location: { ...selection.location, floor2: val },
+                      });
+                    }}
+                    style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor2Change(1)}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ② 内部用 場所グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -1063,103 +1167,33 @@ export const MainArea: React.FC<MainAreaProps> = ({
               }}
             >
               <MapPin size={18} />
-              場所グループ
+              ② 場所グループ
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
-              {/* 建物ボタン */}
-              <button
-                type="button"
-                className={`btn ${selection.location.isBuilding ? 'selected' : ''}`}
-                onClick={handleToggleBuilding}
-                style={{
-                  height: '38px',
-                  fontSize: '0.95rem',
-                  padding: '0 12px',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                建物
-              </button>
-
-              {/* 階数① */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
-                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+              {LOCATION_OPTIONS.map((loc) => {
+                const isSelected = activeLocation === loc;
+                return (
                   <button
+                    key={loc}
                     type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor1Change(-1)}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <input
-                    type="number"
-                    className="stepper-input"
-                    value={selection.location.floor1 || ''}
-                    placeholder="0"
-                    onChange={(e) => {
-                      const val = Math.max(0, parseInt(e.target.value) || 0);
-                      onChangeSelection({
-                        ...selection,
-                        location: { ...selection.location, floor1: val },
-                      });
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleLocationToggle(loc)}
+                    style={{
+                      height: '48px',
+                      fontSize: '0.95rem',
+                      padding: '4px',
+                      fontWeight: 'bold',
                     }}
-                    style={{ height: '36px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
-                  />
-                  <button
-                    type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor1Change(1)}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
                   >
-                    <Plus size={12} />
+                    {loc}
                   </button>
-                </div>
-              </div>
-
-              {/* 階数② */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階②</span>
-                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
-                  <button
-                    type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor2Change(-1)}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
-                  >
-                    <Minus size={12} />
-                  </button>
-                  <input
-                    type="number"
-                    className="stepper-input"
-                    value={selection.location.floor2 || ''}
-                    placeholder="0"
-                    onChange={(e) => {
-                      const val = Math.max(0, parseInt(e.target.value) || 0);
-                      onChangeSelection({
-                        ...selection,
-                        location: { ...selection.location, floor2: val },
-                      });
-                    }}
-                    style={{ height: '36px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
-                  />
-                  <button
-                    type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor2Change(1)}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
-                  >
-                    <Plus size={12} />
-                  </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </section>
 
-          {/* 内部用 方向グループ（東西南北） */}
+          {/* ③ 内部用 方向グループ（東西南北） */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -1180,7 +1214,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Compass size={18} />
-                方向グループ
+                ③ 方向グループ
               </span>
               <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
                 ※最大2つ選択可
@@ -1905,6 +1939,81 @@ export const MainArea: React.FC<MainAreaProps> = ({
             )}
           </section>
 
+          {/* ① 傾斜用 階数グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: isFloorDisabled ? '#f0f0f0' : '#ffffff',
+              opacity: isFloorDisabled ? 0.5 : 1,
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Layers size={18} />
+              ① 階数グループ
+              {isFloorDisabled && (
+                <span style={{ fontSize: '0.75rem', color: '#d9534f', marginLeft: 'auto' }}>
+                  ※ 塀・土間選択中のため無効
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
+              {/* 階数① */}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
+                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '4px' }}>
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(-1)}
+                    disabled={isFloorDisabled}
+                    style={{ width: '36px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="number"
+                    className="stepper-input"
+                    value={selection.location.floor1 || ''}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = Math.max(0, parseInt(e.target.value) || 0);
+                      if (!isFloorDisabled) {
+                        onChangeSelection({
+                          ...selection,
+                          location: { ...selection.location, floor1: val },
+                        });
+                      }
+                    }}
+                    disabled={isFloorDisabled}
+                    style={{ height: '38px', fontSize: '1rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
+                  />
+                  <button
+                    type="button"
+                    className="stepper-btn"
+                    onClick={() => handleFloor1Change(1)}
+                    disabled={isFloorDisabled}
+                    style={{ width: '36px', height: '38px', flexShrink: 0 }}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* ② 傾斜用 場所グループ */}
           <section
             style={{
@@ -1925,62 +2034,29 @@ export const MainArea: React.FC<MainAreaProps> = ({
               }}
             >
               <MapPin size={18} />
-              場所グループ
+              ② 場所グループ
             </div>
 
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
-              {/* 建物ボタン */}
-              <button
-                type="button"
-                className={`btn ${selection.location.isBuilding ? 'selected' : ''}`}
-                onClick={handleToggleBuilding}
-                style={{
-                  height: '38px',
-                  fontSize: '0.95rem',
-                  padding: '0 16px',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                建物
-              </button>
-
-              {/* 階数① */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
-                <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '4px' }}>
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+              {LOCATION_OPTIONS.map((loc) => {
+                const isSelected = activeLocation === loc;
+                return (
                   <button
+                    key={loc}
                     type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor1Change(-1)}
-                    style={{ width: '36px', height: '36px', flexShrink: 0 }}
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <input
-                    type="number"
-                    className="stepper-input"
-                    value={selection.location.floor1 || ''}
-                    placeholder="0"
-                    onChange={(e) => {
-                      const val = Math.max(0, parseInt(e.target.value) || 0);
-                      onChangeSelection({
-                        ...selection,
-                        location: { ...selection.location, floor1: val },
-                      });
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleLocationToggle(loc)}
+                    style={{
+                      height: '48px',
+                      fontSize: '0.95rem',
+                      padding: '4px',
+                      fontWeight: 'bold',
                     }}
-                    style={{ height: '36px', fontSize: '1rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
-                  />
-                  <button
-                    type="button"
-                    className="stepper-btn"
-                    onClick={() => handleFloor1Change(1)}
-                    style={{ width: '36px', height: '36px', flexShrink: 0 }}
                   >
-                    <Plus size={14} />
+                    {loc}
                   </button>
-                </div>
-              </div>
+                );
+              })}
             </div>
           </section>
 
@@ -2005,7 +2081,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Compass size={18} />
-                方向グループ
+                ③ 方向グループ
               </span>
               <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
                 ※最大2つ選択可
@@ -2528,17 +2604,17 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
           {/* サブタイトル */}
           <div className="survey-title">
-            <span style={{ fontSize: '0.95rem' }}>ボタン選択（①場所 ②方向 ③部位 ④損傷 ⑤状況）</span>
+            <span style={{ fontSize: '0.95rem' }}>ボタン選択（①階数 ②場所 ③方向 ④部位 ⑤損傷 ⑥状況）</span>
           </div>
 
-          {/* ① 場所グループ (建物ボタンと階数ボタンを横一列に配置) */}
+          {/* ① 階数グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
               borderRadius: '8px',
               padding: '10px 12px',
-              backgroundColor: isLocationDisabled ? '#f0f0f0' : '#ffffff',
-              opacity: isLocationDisabled ? 0.5 : 1,
+              backgroundColor: isFloorDisabled ? '#f0f0f0' : '#ffffff',
+              opacity: isFloorDisabled ? 0.5 : 1,
               transition: 'all 0.2s ease',
             }}
           >
@@ -2552,46 +2628,28 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 gap: '6px',
               }}
             >
-              <MapPin size={18} />
-              ① 場所グループ
-              {isLocationDisabled && (
+              <Layers size={18} />
+              ① 階数グループ
+              {isFloorDisabled && (
                 <span style={{ fontSize: '0.75rem', color: '#d9534f', marginLeft: 'auto' }}>
                   ※ 塀・土間選択中のため無効
                 </span>
               )}
             </div>
 
-            {/* 建物・階数①・階数② を横一列に配置 */}
-            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', width: '100%' }}>
-              {/* 建物ボタン */}
-              <button
-                type="button"
-                className={`btn ${selection.location.isBuilding ? 'selected' : ''}`}
-                onClick={handleToggleBuilding}
-                disabled={isLocationDisabled}
-                style={{
-                  height: '38px',
-                  fontSize: '0.95rem',
-                  padding: '0 12px',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                建物
-              </button>
-
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: '100%' }}>
               {/* 階数① */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階①</span>
                 <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor1Change(-1)}
-                    disabled={isLocationDisabled}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
+                    disabled={isFloorDisabled}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
-                    <Minus size={12} />
+                    <Minus size={14} />
                   </button>
                   <input
                     type="number"
@@ -2600,40 +2658,40 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isLocationDisabled) {
+                      if (!isFloorDisabled) {
                         onChangeSelection({
                           ...selection,
                           location: { ...selection.location, floor1: val },
                         });
                       }
                     }}
-                    disabled={isLocationDisabled}
-                    style={{ height: '36px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
+                    disabled={isFloorDisabled}
+                    style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
                   />
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor1Change(1)}
-                    disabled={isLocationDisabled}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
+                    disabled={isFloorDisabled}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
-                    <Plus size={12} />
+                    <Plus size={14} />
                   </button>
                 </div>
               </div>
 
               {/* 階数② */}
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '2px', minWidth: 0 }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階②</span>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', minWidth: 0 }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap' }}>階②</span>
                 <div className="number-stepper" style={{ flex: 1, minWidth: 0, gap: '2px' }}>
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor2Change(-1)}
-                    disabled={isLocationDisabled}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
+                    disabled={isFloorDisabled}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
-                    <Minus size={12} />
+                    <Minus size={14} />
                   </button>
                   <input
                     type="number"
@@ -2642,31 +2700,82 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isLocationDisabled) {
+                      if (!isFloorDisabled) {
                         onChangeSelection({
                           ...selection,
                           location: { ...selection.location, floor2: val },
                         });
                       }
                     }}
-                    disabled={isLocationDisabled}
-                    style={{ height: '36px', fontSize: '0.9rem', minWidth: 0, padding: '0 2px' }}
+                    disabled={isFloorDisabled}
+                    style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
                   />
                   <button
                     type="button"
                     className="stepper-btn"
                     onClick={() => handleFloor2Change(1)}
-                    disabled={isLocationDisabled}
-                    style={{ width: '28px', height: '36px', flexShrink: 0 }}
+                    disabled={isFloorDisabled}
+                    style={{ width: '32px', height: '38px', flexShrink: 0 }}
                   >
-                    <Plus size={12} />
+                    <Plus size={14} />
                   </button>
                 </div>
               </div>
             </div>
           </section>
 
-          {/* ② 方向グループ */}
+          {/* ② 場所グループ */}
+          <section
+            style={{
+              border: '2px solid var(--border-color)',
+              borderRadius: '8px',
+              padding: '10px 12px',
+              backgroundColor: '#ffffff',
+            }}
+          >
+            <div
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                marginBottom: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={18} />
+                ② 場所グループ
+              </span>
+              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
+                ※1つのみ選択
+              </span>
+            </div>
+
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+              {LOCATION_OPTIONS.map((loc) => {
+                const isSelected = activeLocation === loc;
+                return (
+                  <button
+                    key={loc}
+                    type="button"
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleLocationToggle(loc)}
+                    style={{
+                      height: '48px',
+                      fontSize: '0.95rem',
+                      padding: '4px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    {loc}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ③ 方向グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -2686,7 +2795,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Compass size={18} />
-                ② 方向グループ
+                ③ 方向グループ
               </span>
               <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
                 ※最大2つ選択可
@@ -2711,7 +2820,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
           </section>
 
-          {/* ③ 部位グループ */}
+          {/* ④ 部位グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -2731,14 +2840,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Box size={18} />
-                ③ 部位グループ
+                ④ 部位グループ
               </span>
               <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
                 ※1つのみ選択
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
               {PART_OPTIONS.map((part) => {
                 const isSelected = selection.part === part;
                 return (
@@ -2756,7 +2865,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             </div>
           </section>
 
-          {/* ④ 損傷グループ */}
+          {/* ⑤ 損傷グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -2778,15 +2887,26 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <AlertCircle size={18} />
-                ④ 損傷グループ
+                ⑤ 損傷グループ
               </span>
               <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
                 ※最大2つ選択可
               </span>
             </div>
 
-            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-              {DAMAGE_OPTIONS.map((dmg) => {
+            <div className="button-grid-3" style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+              {/* 左上: 現況 */}
+              <button
+                type="button"
+                className={`btn ${selection.situationButton === '現況' ? 'selected' : ''}`}
+                onClick={() => handleSituationToggle('現況')}
+                style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold' }}
+              >
+                現況
+              </button>
+
+              {/* 損傷 1〜4: 亀裂, 隙間, HC, 欠落 */}
+              {DAMAGE_OPTIONS.slice(0, 4).map((dmg) => {
                 const isSelected = (selection.damages || []).some(
                   (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg
                 );
@@ -2802,6 +2922,34 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   </button>
                 );
               })}
+
+              {/* 損傷 5〜8: 目地切, 剥離, 割れ, ズレ */}
+              {DAMAGE_OPTIONS.slice(4, 8).map((dmg) => {
+                const isSelected = (selection.damages || []).some(
+                  (d) => d.name === dmg || d.name.replace(/^[左右上下]/, '') === dmg
+                );
+                return (
+                  <button
+                    key={dmg}
+                    type="button"
+                    className={`btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleDamageToggle(dmg)}
+                    style={{ height: '48px', fontSize: '1rem' }}
+                  >
+                    {dmg}
+                  </button>
+                );
+              })}
+
+              {/* 右下: 全景 */}
+              <button
+                type="button"
+                className={`btn ${selection.situationButton === '全景' ? 'selected' : ''}`}
+                onClick={() => handleSituationToggle('全景')}
+                style={{ height: '48px', fontSize: '1rem', fontWeight: 'bold' }}
+              >
+                全景
+              </button>
             </div>
 
             {/* 選択された損傷の数値入力フォーム (数値W, 数値L / 全般, 多数) */}
@@ -3241,7 +3389,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             );
           })()}
 
-          {/* ⑤ 状況グループ */}
+          {/* ⑥ 状況グループ */}
           <section
             style={{
               border: '2px solid var(--border-color)',
@@ -3263,34 +3411,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <FileText size={18} />
-                ⑤ 状況グループ
-              </span>
-              <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 'normal' }}>
-                ※損傷選択時は自動解除
+                ⑥ 状況グループ
               </span>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* 現況ボタン */}
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '現況' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('現況')}
-                style={{ height: '42px', fontSize: '0.95rem', padding: '0 12px', flexShrink: 0 }}
-              >
-                現況
-              </button>
-
-              {/* 全景ボタン（たまにしか使わないため小さめのボタン） */}
-              <button
-                type="button"
-                className={`btn ${selection.situationButton === '全景' ? 'selected' : ''}`}
-                onClick={() => handleSituationToggle('全景')}
-                style={{ height: '34px', fontSize: '0.8rem', padding: '0 8px', flexShrink: 0 }}
-              >
-                全景
-              </button>
-
               {/* テキスト入力ボックス */}
               <input
                 type="text"

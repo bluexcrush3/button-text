@@ -183,11 +183,12 @@ export function getLineComponents(
   }
 
   if (isInclination) {
-    const buildingStr = selection.location?.isBuilding ? '建物' : '';
-    const location = [buildingStr, ...locationNames].filter(Boolean).join('');
+    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
+    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
 
     const { floor1, floor2 } = selection.location || {};
-    const stepperFloor = formatFloor(floor1, floor2);
+    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
+    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
     const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
 
     const part = [selection.part, ...partNames].filter(Boolean).join('');
@@ -217,11 +218,12 @@ export function getLineComponents(
   }
 
   if (isInternal) {
-    const buildingStr = selection.location?.isBuilding ? '建物' : '';
-    const location = [buildingStr, ...locationNames].filter(Boolean).join('');
+    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
+    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
 
     const { floor1, floor2 } = selection.location || {};
-    const stepperFloor = formatFloor(floor1, floor2);
+    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
+    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
     const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
 
     return {
@@ -235,17 +237,13 @@ export function getLineComponents(
     };
   } else {
     // 外部モード
-    let location = '';
-    let floor = '';
+    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
+    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
 
-    if (selection.part !== '塀' && selection.part !== '土間') {
-      const buildingStr = selection.location?.isBuilding ? '建物' : '';
-      location = [buildingStr, ...locationNames].filter(Boolean).join('');
-
-      const { floor1, floor2 } = selection.location || {};
-      const stepperFloor = formatFloor(floor1, floor2);
-      floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
-    }
+    const { floor1, floor2 } = selection.location || {};
+    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
+    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
+    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
 
     const part = [selection.part, ...partNames].filter(Boolean).join('');
 

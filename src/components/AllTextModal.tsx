@@ -57,7 +57,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
         <div className="modal-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileText size={20} />
-            生成文字列 確認（家屋 #{houseNumber}）
+            文字列確認（家屋 #{houseNumber} / 残{1000 - lines.length}）
           </h3>
           <button
             type="button"

@@ -58,7 +58,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '0.95rem' }}>
                     <FileText size={18} color="#0d6efd" />
-                    生成文字列 プレビュー（全 {lines.length} 行）
+                    文字列 プレビュー（全 {lines.length} 行 / 残{1000 - lines.length}）
                 </div>
                 <button
                     type="button"

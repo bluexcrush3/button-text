@@ -89,14 +89,12 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
     return { valueW: 0, preset: '全般', isLessThan: false };
   }
 
-  // 3. プリセット: 多数
-  if (/多数|たすう/i.test(cleaned)) {
-    return { valueW: 0, preset: '多数', isLessThan: false };
-  }
+  // 3. プリセット: 多数チェック
+  const hasTasu = /多数|たすう/i.test(cleaned);
 
   // 4. 50
   if (/\b50\b|50/.test(cleaned)) {
-    return { valueW: 50, preset: null, isLessThan: false };
+    return { valueW: 50, preset: hasTasu ? '多数' : null, isLessThan: false };
   }
 
   // 5. 数値（マイナス・小数含む）の抽出 (例: -1.0, 0.3, 1.5, 2, 0.25 など)
@@ -104,8 +102,13 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
   if (numMatch) {
     const val = parseFloat(numMatch[0]);
     if (!isNaN(val)) {
-      return { valueW: val, preset: null, isLessThan };
+      return { valueW: val, preset: hasTasu ? '多数' : null, isLessThan };
     }
+  }
+
+  // 6. 数値がなく多数のみの場合
+  if (hasTasu) {
+    return { valueW: 0, preset: '多数', isLessThan: false };
   }
 
   return null;
@@ -202,9 +205,18 @@ export function parseVoiceDamageW(
   const splitPattern = /(?:[\s,、\/／&]+|(?<=[^\d])と(?=[^\d])|(?<=\d)と(?=\d)|および|アンド)+/;
   const parts = text.split(splitPattern).filter(Boolean);
 
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (/^(?:多数|たすう)$/i.test(part.trim()) && parsedItems.length > 0 && !parsedItems[parsedItems.length - 1].preset) {
+      parsedItems[parsedItems.length - 1].preset = '多数';
+      continue;
+    }
     const item = parseSingleDamageItem(part);
     if (item) {
+      if (!item.preset && i + 1 < parts.length && /^(?:多数|たすう)$/i.test(parts[i + 1].trim())) {
+        item.preset = '多数';
+        i++;
+      }
       parsedItems.push(item);
       if (parsedItems.length >= Math.max(1, damageCount)) {
         break;
@@ -251,9 +263,13 @@ export function parseVoiceDamageW(
  */
 function formatFeedbackText(items: ParsedDamageW[]): string {
   const formatItem = (item: ParsedDamageW) => {
-    if (item.preset) return `【${item.preset}】`;
+    if (item.preset === '全般') return `【全般】`;
     const prefix = item.isLessThan ? '<' : '';
-    return `W = ${prefix}${item.valueW}`;
+    const numPart = item.valueW !== 0 ? `W = ${prefix}${item.valueW}` : '';
+    if (item.preset === '多数') {
+      return numPart ? `${numPart} 多数` : `【多数】`;
+    }
+    return numPart || `W = 0`;
   };
 
   if (items.length === 1) {

@@ -304,7 +304,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
     const curW = current[index].valueW || 0;
     const nextW = curW === 50 ? 0 : 50;
-    current[index] = { ...current[index], valueW: nextW, preset: null };
+    const nextPreset = current[index].preset === '全般' ? null : current[index].preset;
+    current[index] = { ...current[index], valueW: nextW, preset: nextPreset };
 
     onChangeSelection({
       ...selection,
@@ -766,7 +767,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
     }
     const curW = item.valueW || 0;
     item.valueW = curW === 50 ? 0 : 50;
-    item.preset = null;
+    if (item.preset === '全般') {
+      item.preset = null;
+    }
     updateCustomDamages(list);
   };
 
@@ -2048,8 +2051,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       </div>
                     </div>
 
-                    {/* 「全般」「多数」が未選択の場合のみ数値(W/L)入力ボックスを表示 */}
-                    {!dmg.preset && (
+                    {/* 「全般」が未選択の場合のみ数値(W/L)入力ボックスを表示（「多数」選択時も入力可能） */}
+                    {dmg.preset !== '全般' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {/* 数値1W / 数値2W */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -3448,8 +3451,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       </div>
                     </div>
 
-                    {/* 「全般」「多数」が未選択の場合のみ数値(W/L)入力ボックスを表示 */}
-                    {!dmg.preset && (
+                    {/* 「全般」が未選択の場合のみ数値(W/L)入力ボックスを表示（「多数」選択時も入力可能） */}
+                    {dmg.preset !== '全般' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         {/* 数値1W / 数値2W */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

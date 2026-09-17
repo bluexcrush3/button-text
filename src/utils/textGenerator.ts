@@ -152,7 +152,7 @@ export function getLineComponents(
 
       if (!dmgInfo) {
         customDamageStrings.push(btnName);
-      } else if (dmgInfo.preset) {
+      } else if (dmgInfo.preset === '全般') {
         customDamageStrings.push(`${btnName}${dmgInfo.preset}`);
       } else {
         const wVal = dmgInfo.valueW ?? 0;
@@ -165,6 +165,9 @@ export function getLineComponents(
           valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
         } else if (lVal > 0) {
           valStr = `L${formatDamageValue(lVal)}`;
+        }
+        if (dmgInfo.preset === '多数') {
+          valStr = valStr ? `${valStr}多数` : '多数';
         }
         customDamageStrings.push(`${btnName}${valStr}`);
       }
@@ -237,14 +240,18 @@ export function getLineComponents(
 
     const damageStringsList: string[] = (selection.damages && selection.damages.length > 0)
       ? selection.damages.map((d) => {
-        if (d.preset) return `${d.name}${d.preset}`;
+        if (d.preset === '全般') return `${d.name}${d.preset}`;
         const wVal = d.valueW ?? 0;
         const lVal = d.valueL ?? 0;
         const wPrefix = d.isLessThan ? '<' : '';
-        if (wVal > 0 && lVal > 0) return `${d.name}W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-        if (wVal > 0) return `${d.name}W${wPrefix}${formatDamageValue(wVal)}`;
-        if (lVal > 0) return `${d.name}L${formatDamageValue(lVal)}`;
-        return d.name;
+        let valStr = '';
+        if (wVal > 0 && lVal > 0) valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
+        else if (wVal > 0) valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
+        else if (lVal > 0) valStr = `L${formatDamageValue(lVal)}`;
+        if (d.preset === '多数') {
+          valStr = valStr ? `${valStr}多数` : '多数';
+        }
+        return `${d.name}${valStr}`;
       })
       : customDamageStrings;
 
@@ -274,7 +281,7 @@ export function getLineComponents(
 
     if (allDamageItems.length > 0) {
       allDamageItems.forEach((d) => {
-        if (d.preset) {
+        if (d.preset === '全般') {
           allDamageStrings.push(`${d.name}${d.preset}`);
         } else {
           const wVal = d.valueW ?? d.value ?? 0;
@@ -287,6 +294,9 @@ export function getLineComponents(
             valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
           } else if (lVal > 0) {
             valStr = `L${formatDamageValue(lVal)}`;
+          }
+          if (d.preset === '多数') {
+            valStr = valStr ? `${valStr}多数` : '多数';
           }
           allDamageStrings.push(`${d.name}${valStr}`);
         }
@@ -323,14 +333,10 @@ export function parseDamageName(name: string): { prefix: string; baseName: strin
  * ダメージ項目の数値/プリセット部分をフォーマット (例: W=1.0mm　L=2.0mm、傾斜モード時は 2.5)
  */
 export function formatDamageValueDetail(item: DamageItem, isInclination: boolean = false): string {
-  if (item.preset) {
-    return item.preset;
-  }
-  const wVal = item.valueW ?? item.value ?? 0;
-  const lVal = item.valueL ?? 0;
-  const wPrefix = item.isLessThan ? '<' : '';
-
   if (isInclination) {
+    if (item.preset) {
+      return item.preset;
+    }
     const dirs = item.directions || [];
     const nameStr = item.name || '';
     const hasSouth = dirs.includes('南') || nameStr.includes('南');
@@ -339,10 +345,10 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
     const hasWest = dirs.includes('西') || nameStr.includes('西');
 
     if ((hasSouth && hasNorth) || nameStr.includes('南北0')) {
-      return '南北0';
+      return '南北±0㎜/M';
     }
     if ((hasEast && hasWest) || nameStr.includes('東西0')) {
-      return '東西0';
+      return '東西±0㎜/M';
     }
 
     let dirPrefix = '';
@@ -351,23 +357,40 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
     else if (hasEast) dirPrefix = '東';
     else if (hasWest) dirPrefix = '西';
 
+    const wVal = item.valueW ?? item.value ?? 0;
+    const wPrefix = item.isLessThan ? '<' : '';
+
     if (wVal !== 0) {
-      return `${dirPrefix}${wPrefix}${formatDamageValue(wVal)}`;
+      return `${dirPrefix}${wPrefix}${formatDamageValue(wVal)}㎜/M`;
     }
     if (dirPrefix) {
-      return `${dirPrefix}0`;
+      return `${dirPrefix}0㎜/M`;
     }
     return '';
   }
 
-  if (wVal > 0 && lVal > 0) {
-    return `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
-  } else if (wVal > 0) {
-    return `W=${wPrefix}${formatDamageValue(wVal)}mm`;
-  } else if (lVal > 0) {
-    return `L=${formatDamageValue(lVal)}mm`;
+  if (item.preset === '全般') {
+    return '全般';
   }
-  return '';
+
+  const wVal = item.valueW ?? item.value ?? 0;
+  const lVal = item.valueL ?? 0;
+  const wPrefix = item.isLessThan ? '<' : '';
+
+  let numStr = '';
+  if (wVal > 0 && lVal > 0) {
+    numStr = `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
+  } else if (wVal > 0) {
+    numStr = `W=${wPrefix}${formatDamageValue(wVal)}mm`;
+  } else if (lVal > 0) {
+    numStr = `L=${formatDamageValue(lVal)}mm`;
+  }
+
+  if (item.preset === '多数') {
+    return numStr ? `${numStr}　多数` : '多数';
+  }
+
+  return numStr;
 }
 
 /**
@@ -402,7 +425,7 @@ export function generateLineTextForSpreadsheet(
   let col5 = '';
 
   if (isInclination) {
-    // 傾斜モードの列振り分け
+    // 傾斜モードの列振り分け（1ページに対して必ず3行出力）
     if (hasLocation) {
       col1 = locationAndFloor;
       col3 = [part, sitBtn].filter(Boolean).join('　');
@@ -414,15 +437,22 @@ export function generateLineTextForSpreadsheet(
     const val1 = items[0] ? formatDamageValueDetail(items[0], true) : '';
     const val2 = items[1] ? formatDamageValueDetail(items[1], true) : '';
 
-    col4 = val1;
-    col5 = val2;
+    // 2行目 2列目:
+    // ・数値1が入力されている場合: 数値1
+    // ・数値1未入力で数値2が入力されている場合: 数値2
+    // ・両方未入力の場合: 表示なし
+    const line2Col2 = val1 ? val1 : (val2 ? val2 : '');
 
-    if (!col4 && col5) {
-      col4 = col5;
-      col5 = '';
-    }
+    // 3行目 2列目:
+    // ・数値1と2が両方入力されている場合: 数値2
+    // ・それ以外: 表示なし
+    const line3Col2 = (val1 && val2) ? val2 : '';
 
-    return `${col1}\t${col2}\t${col3}\t${col4}\t${col5}\t${col6}`;
+    const line1 = `${col1}\t${col2}\t${col3}\t\t\t${col6}`;
+    const line2 = `\t${line2Col2}\t\t\t\t`;
+    const line3 = `\t${line3Col2}\t\t\t\t`;
+
+    return `${line1}\n${line2}\n${line3}`;
   }
 
   if (count === 0) {
@@ -525,9 +555,10 @@ export function generateLineText(
 
   const tabText = generateLineTextForSpreadsheet(selection, customButtonsInput);
   return tabText
-    .split('\t')
-    .filter((t) => t.trim().length > 0)
-    .join(' / ');
+    .split(/[\t\n]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0)
+    .join(delimiter);
 }
 
 

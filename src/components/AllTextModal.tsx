@@ -34,7 +34,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
     try {
       const copyText = lines
         .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons))
-        .filter((t) => t.trim().length > 0)
+        .filter((t, idx) => t.trim().length > 0 || lines[idx]?.selection.mode === '傾斜')
         .join('\n');
       await navigator.clipboard.writeText(copyText);
       setCopied(true);

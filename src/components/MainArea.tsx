@@ -601,7 +601,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
     if (isCurrentlySelected) {
       nextSelections = currentCustomSelections.filter(
-        (item) => item !== btnName && item.replace(/^[左右上下]/, '') === baseName
+        (item) => item !== btnName && item.replace(/^[左右上下]/, '') !== baseName
       );
       nextDamages = currentCustomDamages.filter(
         (d) => d.name !== btnName && d.name.replace(/^[左右上下]/, '') !== baseName
@@ -1289,28 +1289,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
               }}
             >
               {displayName}
-              {isSelected && selectedIndex !== -1 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: '2px',
-                    right: '4px',
-                    fontSize: '0.65rem',
-                    backgroundColor: '#ffffff',
-                    color: '#000000',
-                    borderRadius: '50%',
-                    width: '18px',
-                    height: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: '1px solid #222222',
-                    fontWeight: 'bold',
-                  }}
-                >
-                  {selectedIndex + 1}
-                </span>
-              )}
             </button>
           );
         })}
@@ -1422,28 +1400,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 }}
               >
                 {displayName}
-                {isSelected && selectedIndex !== -1 && (
-                  <span
-                    style={{
-                      position: 'absolute',
-                      top: '2px',
-                      right: '4px',
-                      fontSize: '0.65rem',
-                      backgroundColor: '#ffffff',
-                      color: '#000000',
-                      borderRadius: '50%',
-                      width: '18px',
-                      height: '18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '1px solid #222222',
-                      fontWeight: 'bold',
-                    }}
-                  >
-                    {selectedIndex + 1}
-                  </span>
-                )}
               </button>
             );
           } else {
@@ -1979,8 +1935,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#111' }}>
-                        損傷{idx + 1}: {dmg.name}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1d4ed8' }}>
+                        {dmg.name}
                       </span>
 
                       {/* 「左右」「上下」「全般」「多数」ボタン */}
@@ -3379,8 +3335,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '0.8rem', fontWeight: '600', color: '#111' }}>
-                        損傷{idx + 1}: {dmg.name}
+                      <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1d4ed8' }}>
+                        {dmg.name}
                       </span>
 
                       {/* 「左右」「上下」「全般」「多数」ボタン */}

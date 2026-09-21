@@ -4,7 +4,7 @@
 
 export interface ParsedDamageW {
   valueW: number;
-  preset: '全般' | '多数' | null;
+  preset: '全体' | '全般' | '多数' | null;
   isLessThan?: boolean;
 }
 
@@ -84,9 +84,9 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
     return { valueW: 0, preset: null, isLessThan: false };
   }
 
-  // 2. プリセット: 全般
-  if (/全般|ぜんぱん/i.test(cleaned)) {
-    return { valueW: 0, preset: '全般', isLessThan: false };
+  // 2. プリセット: 全体 / 全般
+  if (/(?:全体|ぜんたい|全般|ぜんぱん)/i.test(cleaned)) {
+    return { valueW: 0, preset: '全体', isLessThan: false };
   }
 
   // 3. プリセット: 多数チェック
@@ -263,7 +263,7 @@ export function parseVoiceDamageW(
  */
 function formatFeedbackText(items: ParsedDamageW[]): string {
   const formatItem = (item: ParsedDamageW) => {
-    if (item.preset === '全般') return `【全般】`;
+    if (item.preset === '全体' || item.preset === '全般') return `【全体】`;
     const prefix = item.isLessThan ? '<' : '';
     const numPart = item.valueW !== 0 ? `W = ${prefix}${item.valueW}` : '';
     if (item.preset === '多数') {

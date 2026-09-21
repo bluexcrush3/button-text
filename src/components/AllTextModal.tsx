@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LineData, CustomButtonConfig } from '../types';
 import { generateLineText, generateLineTextForSpreadsheet, CustomButtonsInput } from '../utils/textGenerator';
-import { FileText, Copy, Check, X } from 'lucide-react';
+import { FileText, Copy, Check, X, WrapText } from 'lucide-react';
 
 interface AllTextModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
   customButtons = [],
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isWrapText, setIsWrapText] = useState(false);
 
   if (!isOpen) return null;
 
@@ -57,7 +58,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
         <div className="modal-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <FileText size={20} />
-            文字列確認（家屋 #{houseNumber} / 残{1000 - lines.length}）
+            確認（家屋 #{houseNumber} / 残{1000 - lines.length}）
           </h3>
           <button
             type="button"
@@ -69,9 +70,21 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
         </div>
 
         <div className="modal-body">
-          <p style={{ fontSize: '0.85rem', color: '#555' }}>
-            全 {lines.length} 行のデータ一覧です。行をタップするとそのページに飛べます。
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <p style={{ fontSize: '0.85rem', color: '#555', margin: 0 }}>
+              全 {lines.length} 行のデータ一覧です。行をタップすると飛べます。
+            </p>
+            <button
+              type="button"
+              className={`btn ${isWrapText ? 'selected' : ''}`}
+              onClick={() => setIsWrapText(!isWrapText)}
+              style={{ padding: '3px 8px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}
+              title={isWrapText ? '省略表示に切り替え' : '全文表示に切り替え'}
+            >
+              <WrapText size={14} />
+              全文
+            </button>
+          </div>
 
           <div
             style={{
@@ -102,7 +115,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
                     backgroundColor: isCurrent ? '#eef6ff' : '#ffffff',
                     cursor: 'pointer',
                     display: 'flex',
-                    alignItems: 'center',
+                    alignItems: isWrapText ? 'flex-start' : 'center',
                     justifyContent: 'space-between',
                     gap: '8px',
                     transition: 'all 0.15s ease',
@@ -115,6 +128,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
                       color: isCurrent ? '#0d6efd' : '#666',
                       minWidth: '40px',
                       flexShrink: 0,
+                      marginTop: isWrapText ? '2px' : 0,
                     }}
                   >
                     行 {idx + 1}
@@ -125,9 +139,10 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
                       fontWeight: text ? 'bold' : 'normal',
                       color: text ? '#111' : '#aaa',
                       flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      overflow: isWrapText ? 'visible' : 'hidden',
+                      textOverflow: isWrapText ? 'clip' : 'ellipsis',
+                      whiteSpace: isWrapText ? 'pre-wrap' : 'nowrap',
+                      wordBreak: isWrapText ? 'break-all' : 'normal',
                       fontFamily: 'monospace',
                     }}
                   >
@@ -142,6 +157,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
                         padding: '2px 6px',
                         borderRadius: '4px',
                         flexShrink: 0,
+                        marginTop: isWrapText ? '2px' : 0,
                       }}
                     >
                       編集中
@@ -171,3 +187,4 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
     </div>
   );
 };
+

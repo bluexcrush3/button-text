@@ -23,10 +23,11 @@ export interface LocationData {
  * ④ 損傷グループの各項目
  */
 export interface DamageItem {
-  name: string;  // '亀裂', '隙間', 'HC', '欠落', '目地切れ', '剥離'
+  name: string;  // '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離'
   valueW: number; // 数値W (W寸法, 0 = 入力なし)
   valueL: number; // 数値L (L寸法, 0 = 入力なし)
-  preset?: '全般' | '多数' | null; // 全般 / 多数 選択肢
+  hasL?: boolean; // 数値L入力有無 (「L有」ボタン)
+  preset?: '全体' | '全般' | '多数' | null; // 全体 / 多数 選択肢 ('全般'は旧データ互換用)
   isLessThan?: boolean; // 「以下」フラグ (<〇〇)
   value?: number; // 互換性用
   directions?: string[]; // 傾斜モード等での方向指定 ['南', '北'] / ['東', '西']

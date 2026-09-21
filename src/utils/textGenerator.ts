@@ -152,24 +152,8 @@ export function getLineComponents(
 
       if (!dmgInfo) {
         customDamageStrings.push(btnName);
-      } else if (dmgInfo.preset === '全般') {
-        customDamageStrings.push(`${btnName}${dmgInfo.preset}`);
       } else {
-        const wVal = dmgInfo.valueW ?? 0;
-        const lVal = dmgInfo.valueL ?? 0;
-        const wPrefix = dmgInfo.isLessThan ? '<' : '';
-        let valStr = '';
-        if (wVal > 0 && lVal > 0) {
-          valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-        } else if (wVal > 0) {
-          valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
-        } else if (lVal > 0) {
-          valStr = `L${formatDamageValue(lVal)}`;
-        }
-        if (dmgInfo.preset === '多数') {
-          valStr = valStr ? `${valStr}多数` : '多数';
-        }
-        customDamageStrings.push(`${btnName}${valStr}`);
+        customDamageStrings.push(buildDamageItemString(itemToPush, btnName));
       }
     }
   });
@@ -239,20 +223,7 @@ export function getLineComponents(
       : customDamageItemsList;
 
     const damageStringsList: string[] = (selection.damages && selection.damages.length > 0)
-      ? selection.damages.map((d) => {
-        if (d.preset === '全般') return `${d.name}${d.preset}`;
-        const wVal = d.valueW ?? 0;
-        const lVal = d.valueL ?? 0;
-        const wPrefix = d.isLessThan ? '<' : '';
-        let valStr = '';
-        if (wVal > 0 && lVal > 0) valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-        else if (wVal > 0) valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
-        else if (lVal > 0) valStr = `L${formatDamageValue(lVal)}`;
-        if (d.preset === '多数') {
-          valStr = valStr ? `${valStr}多数` : '多数';
-        }
-        return `${d.name}${valStr}`;
-      })
+      ? selection.damages.map((d) => buildDamageItemString(d))
       : customDamageStrings;
 
     return {
@@ -281,25 +252,7 @@ export function getLineComponents(
 
     if (allDamageItems.length > 0) {
       allDamageItems.forEach((d) => {
-        if (d.preset === '全般') {
-          allDamageStrings.push(`${d.name}${d.preset}`);
-        } else {
-          const wVal = d.valueW ?? d.value ?? 0;
-          const lVal = d.valueL ?? 0;
-          const wPrefix = d.isLessThan ? '<' : '';
-          let valStr = '';
-          if (wVal > 0 && lVal > 0) {
-            valStr = `W${wPrefix}${formatDamageValue(wVal)}L${formatDamageValue(lVal)}`;
-          } else if (wVal > 0) {
-            valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
-          } else if (lVal > 0) {
-            valStr = `L${formatDamageValue(lVal)}`;
-          }
-          if (d.preset === '多数') {
-            valStr = valStr ? `${valStr}多数` : '多数';
-          }
-          allDamageStrings.push(`${d.name}${valStr}`);
-        }
+        allDamageStrings.push(buildDamageItemString(d));
       });
     }
 
@@ -313,6 +266,34 @@ export function getLineComponents(
       situation,
     };
   }
+}
+
+/**
+ * 損傷アイテムの簡易文字列フォーマット
+ */
+export function buildDamageItemString(d: DamageItem, btnName?: string): string {
+  const name = btnName || d.name;
+  const wVal = d.valueW ?? d.value ?? 0;
+  const lVal = d.valueL ?? 0;
+  const hasL = Boolean(d.hasL || lVal > 0);
+  const wPrefix = d.isLessThan ? '<' : '';
+
+  let valStr = '';
+  if (wVal > 0 && hasL) {
+    const lStr = lVal > 0 ? `L${formatDamageValue(lVal)}` : 'L全長';
+    valStr = `W${wPrefix}${formatDamageValue(wVal)}${lStr}`;
+  } else if (wVal > 0) {
+    valStr = `W${wPrefix}${formatDamageValue(wVal)}`;
+  } else if (hasL) {
+    const lStr = lVal > 0 ? `L${formatDamageValue(lVal)}` : 'L全長';
+    valStr = `${lStr}`;
+  }
+
+  const presetText = (d.preset === '全般' || d.preset === '全体') ? '全体' : (d.preset === '多数' ? '多数' : '');
+  if (presetText) {
+    valStr = valStr ? `${valStr}${presetText}` : presetText;
+  }
+  return `${name}${valStr}`;
 }
 
 /**
@@ -335,7 +316,7 @@ export function parseDamageName(name: string): { prefix: string; baseName: strin
 export function formatDamageValueDetail(item: DamageItem, isInclination: boolean = false): string {
   if (isInclination) {
     if (item.preset) {
-      return item.preset;
+      return (item.preset === '全般' || item.preset === '全体') ? '全体' : item.preset;
     }
     const dirs = item.directions || [];
     const nameStr = item.name || '';
@@ -369,25 +350,25 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
     return '';
   }
 
-  if (item.preset === '全般') {
-    return '全般';
-  }
-
   const wVal = item.valueW ?? item.value ?? 0;
   const lVal = item.valueL ?? 0;
+  const hasL = Boolean(item.hasL || lVal > 0);
   const wPrefix = item.isLessThan ? '<' : '';
 
   let numStr = '';
-  if (wVal > 0 && lVal > 0) {
-    numStr = `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${formatDamageValue(lVal)}mm`;
+  if (wVal > 0 && hasL) {
+    const lStr = lVal > 0 ? `${formatDamageValue(lVal)}mm` : '全長';
+    numStr = `W=${wPrefix}${formatDamageValue(wVal)}mm　L=${lStr}`;
   } else if (wVal > 0) {
     numStr = `W=${wPrefix}${formatDamageValue(wVal)}mm`;
-  } else if (lVal > 0) {
-    numStr = `L=${formatDamageValue(lVal)}mm`;
+  } else if (hasL) {
+    const lStr = lVal > 0 ? `${formatDamageValue(lVal)}mm` : '全長';
+    numStr = `L=${lStr}`;
   }
 
-  if (item.preset === '多数') {
-    return numStr ? `${numStr}　多数` : '多数';
+  const presetText = (item.preset === '全般' || item.preset === '全体') ? '全体' : (item.preset === '多数' ? '多数' : '');
+  if (presetText) {
+    return numStr ? `${numStr}　${presetText}` : presetText;
   }
 
   return numStr;

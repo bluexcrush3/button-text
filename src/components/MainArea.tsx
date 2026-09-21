@@ -297,6 +297,26 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
+  // 損傷の「L有」トグル切り替え
+  const handleDamageLHasToggle = (index: number) => {
+    const current = [...(selection.damages || [])];
+    if (!current[index]) return;
+
+    const currentHasL = current[index].hasL || (current[index].valueL || 0) > 0;
+    const nextHasL = !currentHasL;
+    current[index] = {
+      ...current[index],
+      hasL: nextHasL,
+      valueL: nextHasL ? current[index].valueL : 0,
+    };
+
+    onChangeSelection({
+      ...selection,
+      damages: current,
+      situationButton: null,
+    });
+  };
+
   // 損傷の50設定
   const handleDamage50Set = (index: number) => {
     const current = [...(selection.damages || [])];
@@ -304,7 +324,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
     const curW = current[index].valueW || 0;
     const nextW = curW === 50 ? 0 : 50;
-    const nextPreset = current[index].preset === '全般' ? null : current[index].preset;
+    const nextPreset = (current[index].preset === '全般' || current[index].preset === '全体') ? null : current[index].preset;
     current[index] = { ...current[index], valueW: nextW, preset: nextPreset };
 
     onChangeSelection({
@@ -314,12 +334,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
-  // 損傷のプリセット(全般 / 多数)切り替え
-  const handleDamagePresetToggle = (index: number, presetType: '全般' | '多数') => {
+  // 損傷のプリセット(全体 / 多数)切り替え
+  const handleDamagePresetToggle = (index: number, presetType: '全体' | '多数') => {
     const current = [...(selection.damages || [])];
     if (!current[index]) return;
 
-    const nextPreset = current[index].preset === presetType ? null : presetType;
+    const isCurrentPreset = current[index].preset === presetType || (presetType === '全体' && current[index].preset === '全般');
+    const nextPreset = isCurrentPreset ? null : presetType;
     current[index] = { ...current[index], preset: nextPreset };
 
     onChangeSelection({
@@ -758,6 +779,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
     updateCustomDamages(list);
   };
 
+  const handleCustomDamageLHasToggle = (btnName: string) => {
+    const list = [...currentCustomDamages];
+    let item = list.find((d) => d.name === btnName);
+    if (!item) {
+      item = { name: btnName, valueW: 0, valueL: 0 };
+      list.push(item);
+    }
+    const currentHasL = item.hasL || (item.valueL || 0) > 0;
+    item.hasL = !currentHasL;
+    if (!item.hasL) {
+      item.valueL = 0;
+    }
+    updateCustomDamages(list);
+  };
+
   const handleCustomDamage50Set = (btnName: string) => {
     const list = [...currentCustomDamages];
     let item = list.find((d) => d.name === btnName);
@@ -767,20 +803,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
     }
     const curW = item.valueW || 0;
     item.valueW = curW === 50 ? 0 : 50;
-    if (item.preset === '全般') {
+    if (item.preset === '全般' || item.preset === '全体') {
       item.preset = null;
     }
     updateCustomDamages(list);
   };
 
-  const handleCustomDamagePresetToggle = (btnName: string, presetType: '全般' | '多数') => {
+  const handleCustomDamagePresetToggle = (btnName: string, presetType: '全体' | '多数') => {
     const list = [...currentCustomDamages];
     let item = list.find((d) => d.name === btnName);
     if (!item) {
       item = { name: btnName, valueW: 0, valueL: 0 };
       list.push(item);
     }
-    item.preset = item.preset === presetType ? null : presetType;
+    const isCurrentPreset = item.preset === presetType || (presetType === '全体' && item.preset === '全般');
+    item.preset = isCurrentPreset ? null : presetType;
     updateCustomDamages(list);
   };
 
@@ -1939,7 +1976,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         {dmg.name}
                       </span>
 
-                      {/* 「左右」「上下」「全般」「多数」ボタン */}
+                      {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           type="button"
@@ -1990,11 +2027,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         </button>
                         <button
                           type="button"
-                          className={`btn ${dmg.preset === '全般' ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '全般')}
+                          className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
+                          onClick={() => handleDamageLHasToggle(idx)}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
+                          title="L有 (数値Lの入力欄表示)"
+                        >
+                          L有
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
+                          onClick={() => handleDamagePresetToggle(idx, '全体')}
                           style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
                         >
-                          全般
+                          全体
                         </button>
                         <button
                           type="button"
@@ -2007,60 +2053,60 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       </div>
                     </div>
 
-                    {/* 「全般」が未選択の場合のみ数値(W/L)入力ボックスを表示（「多数」選択時も入力可能） */}
-                    {dmg.preset !== '全般' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {/* 数値1W / 数値2W */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                            数値{idx + 1}W:
-                          </span>
-                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, -1.0)}
-                              style={{ flex: 1, height: '34px', padding: 0 }}
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, -0.5)}
-                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
-                            >
-                              -0.5
-                            </button>
-                            <input
-                              type="number"
-                              step="0.1"
-                              className="stepper-input"
-                              value={dmg.valueW || ''}
-                              placeholder="0"
-                              onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
-                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, 0.5)}
-                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
-                            >
-                              +0.5
-                            </button>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, 1.0)}
-                              style={{ flex: 1, height: '34px', padding: 0 }}
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
+                    {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {/* 数値1W / 数値2W */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                          数値{idx + 1}W:
+                        </span>
+                        <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, -1.0)}
+                            style={{ flex: 1, height: '34px', padding: 0 }}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, -0.5)}
+                            style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                          >
+                            -0.5
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="stepper-input"
+                            value={dmg.valueW || ''}
+                            placeholder="0"
+                            onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
+                            style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, 0.5)}
+                            style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                          >
+                            +0.5
+                          </button>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, 1.0)}
+                            style={{ flex: 1, height: '34px', padding: 0 }}
+                          >
+                            <Plus size={12} />
+                          </button>
                         </div>
+                      </div>
 
-                        {/* 数値1L / 数値2L */}
+                      {/* 数値1L / 数値2L（「L有」選択時のみ表示） */}
+                      {(dmg.hasL || (dmg.valueL || 0) > 0) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
                             数値{idx + 1}L:
@@ -2087,7 +2133,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               step="0.1"
                               className="stepper-input"
                               value={dmg.valueL || ''}
-                              placeholder="0"
+                              placeholder="全長"
                               onChange={(e) => handleDamageValueLInput(idx, e.target.value)}
                               style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                             />
@@ -2109,8 +2155,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                             </button>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -2648,11 +2694,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     border: isBoth ? '1px solid #fca5a5' : '1px solid #bbf7d0',
                   }}
                 >
-                  <span style={{ fontSize: '0.85rem', fontWeight: 'bold', minWidth: '46px', color: isBoth ? '#991b1b' : '#166534', flexShrink: 0 }}>
-                    数値{idx + 1}:
-                  </span>
-
-                  {/* 方向ボタン（数値1: 南/北, 数値2: 東/西） */}
+                  {/* 方向ボタン（南/北, 東/西） */}
                   <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                     {dirButtons.map((dir) => {
                       const isDirSelected = dirs.includes(dir);
@@ -2664,9 +2706,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                           onClick={() => handleInclinationDirectionToggle(idx, dir)}
                           style={{
                             height: '36px',
-                            minWidth: '36px',
-                            padding: '0 8px',
-                            fontSize: '0.9rem',
+                            minWidth: '56px',
+                            padding: '0 12px',
+                            fontSize: '1rem',
                             fontWeight: 'bold',
                           }}
                         >
@@ -3339,7 +3381,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         {dmg.name}
                       </span>
 
-                      {/* 「左右」「上下」「全般」「多数」ボタン */}
+                      {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
                       <div style={{ display: 'flex', gap: '4px' }}>
                         <button
                           type="button"
@@ -3390,11 +3432,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         </button>
                         <button
                           type="button"
-                          className={`btn ${dmg.preset === '全般' ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '全般')}
+                          className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
+                          onClick={() => handleDamageLHasToggle(idx)}
+                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
+                          title="L有 (数値Lの入力欄表示)"
+                        >
+                          L有
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
+                          onClick={() => handleDamagePresetToggle(idx, '全体')}
                           style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
                         >
-                          全般
+                          全体
                         </button>
                         <button
                           type="button"
@@ -3407,60 +3458,60 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       </div>
                     </div>
 
-                    {/* 「全般」が未選択の場合のみ数値(W/L)入力ボックスを表示（「多数」選択時も入力可能） */}
-                    {dmg.preset !== '全般' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {/* 数値1W / 数値2W */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
-                            数値{idx + 1}W:
-                          </span>
-                          <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, -1.0)}
-                              style={{ flex: 1, height: '34px', padding: 0 }}
-                            >
-                              <Minus size={12} />
-                            </button>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, -0.5)}
-                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
-                            >
-                              -0.5
-                            </button>
-                            <input
-                              type="number"
-                              step="0.1"
-                              className="stepper-input"
-                              value={dmg.valueW || ''}
-                              placeholder="0"
-                              onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
-                              style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
-                            />
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, 0.5)}
-                              style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
-                            >
-                              +0.5
-                            </button>
-                            <button
-                              type="button"
-                              className="btn stepper-btn"
-                              onClick={() => handleDamageValueWChange(idx, 1.0)}
-                              style={{ flex: 1, height: '34px', padding: 0 }}
-                            >
-                              <Plus size={12} />
-                            </button>
-                          </div>
+                    {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      {/* 数値1W / 数値2W */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
+                          数値{idx + 1}W:
+                        </span>
+                        <div className="number-stepper" style={{ flex: 1, gap: '2px' }}>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, -1.0)}
+                            style={{ flex: 1, height: '34px', padding: 0 }}
+                          >
+                            <Minus size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, -0.5)}
+                            style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                          >
+                            -0.5
+                          </button>
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="stepper-input"
+                            value={dmg.valueW || ''}
+                            placeholder="0"
+                            onChange={(e) => handleDamageValueWInput(idx, e.target.value)}
+                            style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
+                          />
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, 0.5)}
+                            style={{ flex: 1, height: '34px', fontSize: '0.75rem', padding: 0 }}
+                          >
+                            +0.5
+                          </button>
+                          <button
+                            type="button"
+                            className="btn stepper-btn"
+                            onClick={() => handleDamageValueWChange(idx, 1.0)}
+                            style={{ flex: 1, height: '34px', padding: 0 }}
+                          >
+                            <Plus size={12} />
+                          </button>
                         </div>
+                      </div>
 
-                        {/* 数値1L / 数値2L */}
+                      {/* 数値1L / 数値2L（「L有」選択時のみ表示） */}
+                      {(dmg.hasL || (dmg.valueL || 0) > 0) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 'bold', minWidth: '38px', flexShrink: 0 }}>
                             数値{idx + 1}L:
@@ -3487,7 +3538,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               step="0.1"
                               className="stepper-input"
                               value={dmg.valueL || ''}
-                              placeholder="0"
+                              placeholder="全長"
                               onChange={(e) => handleDamageValueLInput(idx, e.target.value)}
                               style={{ height: '34px', fontSize: '0.9rem', width: '126px', flexShrink: 0, textAlign: 'center', padding: '0 2px' }}
                             />
@@ -3509,8 +3560,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                             </button>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

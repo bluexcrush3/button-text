@@ -223,7 +223,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
         lastTranscriptRef.current = '';
         const hintText =
           items.length === 1
-            ? '例:「0.3 確定」「全般 以上」'
+            ? '例:「0.3 確定」「全体 以上」'
             : '例:「0.3と0.5 確定」「0.3 0.5 完了」';
         showFeedback('info', '🎙️ 音声入力中...', hintText, 0, true);
       };

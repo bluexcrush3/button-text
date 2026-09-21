@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { LineData, CustomButtonConfig } from '../types';
 import { generateLineText, generateLineTextForSpreadsheet, CustomButtonsInput } from '../utils/textGenerator';
-import { FileText, Copy, Check } from 'lucide-react';
+import { FileText, Copy, Check, WrapText } from 'lucide-react';
 
 interface AllTextPreviewPanelProps {
     lines: LineData[];
@@ -17,6 +17,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
     customButtons = [],
 }) => {
     const [copied, setCopied] = useState(false);
+    const [isWrapText, setIsWrapText] = useState(false);
 
     const lineTexts = lines.map((line) => generateLineText(line.selection, customButtons));
     const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
@@ -58,18 +59,30 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '0.95rem' }}>
                     <FileText size={18} color="#0d6efd" />
-                    文字列 プレビュー（全 {lines.length} 行 / 残{1000 - lines.length}）
+                    プレビュー（全 {lines.length} 行 / 残{1000 - lines.length}）
                 </div>
-                <button
-                    type="button"
-                    className="btn selected"
-                    onClick={handleCopy}
-                    disabled={!fullText}
-                    style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                    {copied ? 'コピー完了' : '一括コピー'}
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                        type="button"
+                        className={`btn ${isWrapText ? 'selected' : ''}`}
+                        onClick={() => setIsWrapText(!isWrapText)}
+                        style={{ padding: '4px 8px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                        title={isWrapText ? '省略表示に切り替え' : '全文表示に切り替え'}
+                    >
+                        <WrapText size={14} />
+                        全文
+                    </button>
+                    <button
+                        type="button"
+                        className="btn selected"
+                        onClick={handleCopy}
+                        disabled={!fullText}
+                        style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                        {copied ? <Check size={14} /> : <Copy size={14} />}
+                        {copied ? 'コピー完了' : '一括コピー'}
+                    </button>
+                </div>
             </div>
 
             <div
@@ -100,7 +113,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                                 backgroundColor: isCurrent ? '#eef6ff' : '#ffffff',
                                 cursor: 'pointer',
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: isWrapText ? 'flex-start' : 'center',
                                 justifyContent: 'space-between',
                                 gap: '8px',
                                 transition: 'all 0.15s ease',
@@ -113,6 +126,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                                     color: isCurrent ? '#0d6efd' : '#666',
                                     minWidth: '36px',
                                     flexShrink: 0,
+                                    marginTop: isWrapText ? '2px' : 0,
                                 }}
                             >
                                 行 {idx + 1}
@@ -123,9 +137,10 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                                     fontWeight: text ? 'bold' : 'normal',
                                     color: text ? '#111' : '#aaa',
                                     flex: 1,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
+                                    overflow: isWrapText ? 'visible' : 'hidden',
+                                    textOverflow: isWrapText ? 'clip' : 'ellipsis',
+                                    whiteSpace: isWrapText ? 'pre-wrap' : 'nowrap',
+                                    wordBreak: isWrapText ? 'break-all' : 'normal',
                                     fontFamily: 'monospace',
                                 }}
                             >
@@ -141,6 +156,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                                         borderRadius: '4px',
                                         flexShrink: 0,
                                         fontWeight: 'bold',
+                                        marginTop: isWrapText ? '2px' : 0,
                                     }}
                                 >
                                     編集中
@@ -153,3 +169,4 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
         </section>
     );
 };
+

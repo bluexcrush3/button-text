@@ -31,6 +31,9 @@ export function normalizeJapaneseNumbers(text: string): string {
   s = s.replace(/[！-～]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0));
   s = s.replace(/　/g, ' ');
 
+  // 「西」の誤認識補正（音声認識エンジンが「にし」を「二千」「2000」と誤変換してしまうケースへの対策）
+  s = s.replace(/2000|2,000|二千/g, '西');
+
   // 50の読み
   s = s.replace(/ごじゅう|五十|五〇|５０/gi, '50');
 

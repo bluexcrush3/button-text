@@ -2036,86 +2036,87 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       paddingBottom: idx < selection.damages.length - 1 ? '8px' : '0',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {/* 損傷名エリア */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1d4ed8' }}>
                         {dmg.name}
                       </span>
+                    </div>
 
-                      {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          type="button"
-                          className={`btn ${selection.damages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
-                          onClick={() => handleDamageDirectionPreset('左右')}
-                          disabled={selection.damages.length !== 1}
-                          style={{
-                            height: '28px',
-                            fontSize: '0.75rem',
-                            padding: '0 8px',
-                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
-                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          左右
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${selection.damages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
-                          onClick={() => handleDamageDirectionPreset('上下')}
-                          disabled={selection.damages.length !== 1}
-                          style={{
-                            height: '28px',
-                            fontSize: '0.75rem',
-                            padding: '0 8px',
-                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
-                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          上下
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
-                          onClick={() => handleDamageLessThanToggle(idx)}
-                          style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
-                          title="以下 (＜) を指定"
-                        >
-                          &lt;
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
-                          onClick={() => handleDamage50Set(idx)}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
-                        >
-                          50
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
-                          onClick={() => handleDamageLHasToggle(idx)}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
-                          title="L有 (数値Lの入力欄表示)"
-                        >
-                          L有
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '全体')}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
-                        >
-                          全体
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.preset === '多数' ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '多数')}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
-                        >
-                          多数
-                        </button>
-                      </div>
+                    {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className={`btn ${selection.damages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
+                        onClick={() => handleDamageDirectionPreset('左右')}
+                        disabled={selection.damages.length !== 1}
+                        style={{
+                          height: '28px',
+                          fontSize: '0.75rem',
+                          padding: '0 8px',
+                          opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                          cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        左右
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${selection.damages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
+                        onClick={() => handleDamageDirectionPreset('上下')}
+                        disabled={selection.damages.length !== 1}
+                        style={{
+                          height: '28px',
+                          fontSize: '0.75rem',
+                          padding: '0 8px',
+                          opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                          cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        上下
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
+                        onClick={() => handleDamageLessThanToggle(idx)}
+                        style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
+                        title="以下 (＜) を指定"
+                      >
+                        &lt;
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
+                        onClick={() => handleDamage50Set(idx)}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
+                      >
+                        50
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
+                        onClick={() => handleDamageLHasToggle(idx)}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
+                        title="L有 (数値Lの入力欄表示)"
+                      >
+                        L有
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
+                        onClick={() => handleDamagePresetToggle(idx, '全体')}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                      >
+                        全体
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.preset === '多数' ? 'selected' : ''}`}
+                        onClick={() => handleDamagePresetToggle(idx, '多数')}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                      >
+                        多数
+                      </button>
                     </div>
 
                     {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}
@@ -3441,86 +3442,87 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       paddingBottom: idx < selection.damages.length - 1 ? '8px' : '0',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {/* 損傷名エリア */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#1d4ed8' }}>
                         {dmg.name}
                       </span>
+                    </div>
 
-                      {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <button
-                          type="button"
-                          className={`btn ${selection.damages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
-                          onClick={() => handleDamageDirectionPreset('左右')}
-                          disabled={selection.damages.length !== 1}
-                          style={{
-                            height: '28px',
-                            fontSize: '0.75rem',
-                            padding: '0 8px',
-                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
-                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          左右
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${selection.damages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
-                          onClick={() => handleDamageDirectionPreset('上下')}
-                          disabled={selection.damages.length !== 1}
-                          style={{
-                            height: '28px',
-                            fontSize: '0.75rem',
-                            padding: '0 8px',
-                            opacity: selection.damages.length !== 1 ? 0.5 : 1,
-                            cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          上下
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
-                          onClick={() => handleDamageLessThanToggle(idx)}
-                          style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
-                          title="以下 (＜) を指定"
-                        >
-                          &lt;
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
-                          onClick={() => handleDamage50Set(idx)}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
-                        >
-                          50
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
-                          onClick={() => handleDamageLHasToggle(idx)}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
-                          title="L有 (数値Lの入力欄表示)"
-                        >
-                          L有
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '全体')}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
-                        >
-                          全体
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn ${dmg.preset === '多数' ? 'selected' : ''}`}
-                          onClick={() => handleDamagePresetToggle(idx, '多数')}
-                          style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
-                        >
-                          多数
-                        </button>
-                      </div>
+                    {/* 「左右」「上下」「<」「50」「L有」「全体」「多数」ボタン */}
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className={`btn ${selection.damages.some((d) => d.name.startsWith('左') || d.name.startsWith('右')) ? 'selected' : ''}`}
+                        onClick={() => handleDamageDirectionPreset('左右')}
+                        disabled={selection.damages.length !== 1}
+                        style={{
+                          height: '28px',
+                          fontSize: '0.75rem',
+                          padding: '0 8px',
+                          opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                          cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        左右
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${selection.damages.some((d) => d.name.startsWith('上') || d.name.startsWith('下')) ? 'selected' : ''}`}
+                        onClick={() => handleDamageDirectionPreset('上下')}
+                        disabled={selection.damages.length !== 1}
+                        style={{
+                          height: '28px',
+                          fontSize: '0.75rem',
+                          padding: '0 8px',
+                          opacity: selection.damages.length !== 1 ? 0.5 : 1,
+                          cursor: selection.damages.length !== 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        上下
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.isLessThan ? 'selected' : ''}`}
+                        onClick={() => handleDamageLessThanToggle(idx)}
+                        style={{ height: '28px', fontSize: '0.8rem', padding: '0 8px', fontWeight: 'bold' }}
+                        title="以下 (＜) を指定"
+                      >
+                        &lt;
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.valueW === 50 ? 'selected' : ''}`}
+                        onClick={() => handleDamage50Set(idx)}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: dmg.valueW === 50 ? 'bold' : 'normal' }}
+                      >
+                        50
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${(dmg.hasL || (dmg.valueL || 0) > 0) ? 'selected' : ''}`}
+                        onClick={() => handleDamageLHasToggle(idx)}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px', fontWeight: (dmg.hasL || (dmg.valueL || 0) > 0) ? 'bold' : 'normal' }}
+                        title="L有 (数値Lの入力欄表示)"
+                      >
+                        L有
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${(dmg.preset === '全体' || dmg.preset === '全般') ? 'selected' : ''}`}
+                        onClick={() => handleDamagePresetToggle(idx, '全体')}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                      >
+                        全体
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn ${dmg.preset === '多数' ? 'selected' : ''}`}
+                        onClick={() => handleDamagePresetToggle(idx, '多数')}
+                        style={{ height: '28px', fontSize: '0.75rem', padding: '0 8px' }}
+                      >
+                        多数
+                      </button>
                     </div>
 
                     {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}

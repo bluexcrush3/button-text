@@ -1616,7 +1616,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
       {/* モード切替エリア & クリアボタン */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '2px solid var(--border-color)', paddingBottom: '10px', marginBottom: '8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>モード:</span>
           <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
             {(['外部', '内部', '傾斜'] as SurveyType[]).map((m) => {
               const isSelected = currentMode === m;

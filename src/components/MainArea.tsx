@@ -52,6 +52,61 @@ const loadOrderedList = (key: string, defaults: string[]): string[] => {
   return defaults;
 };
 
+const getAdaptiveButtonTextStyle = (text: string, baseFontSizeStyle?: string | number): React.CSSProperties => {
+  const len = text ? text.length : 0;
+  let baseRem = 0.95;
+  if (typeof baseFontSizeStyle === 'string') {
+    const parsed = parseFloat(baseFontSizeStyle);
+    if (!isNaN(parsed)) baseRem = parsed;
+  } else if (typeof baseFontSizeStyle === 'number') {
+    baseRem = baseFontSizeStyle;
+  }
+
+  if (len >= 7) {
+    return {
+      fontSize: `${Math.min(baseRem, 0.65)}rem`,
+      lineHeight: 1.1,
+      wordBreak: 'break-all',
+      whiteSpace: 'normal',
+      padding: '1px 2px',
+      overflow: 'hidden',
+    };
+  } else if (len === 6) {
+    return {
+      fontSize: `${Math.min(baseRem, 0.72)}rem`,
+      lineHeight: 1.1,
+      wordBreak: 'break-all',
+      whiteSpace: 'normal',
+      padding: '1px 2px',
+      overflow: 'hidden',
+    };
+  } else if (len === 5) {
+    return {
+      fontSize: `${Math.min(baseRem, 0.78)}rem`,
+      lineHeight: 1.15,
+      wordBreak: 'break-all',
+      whiteSpace: 'normal',
+      padding: '2px 2px',
+      overflow: 'hidden',
+    };
+  } else if (len === 4) {
+    return {
+      fontSize: `${Math.min(baseRem, 0.86)}rem`,
+      lineHeight: 1.2,
+      whiteSpace: 'nowrap',
+      padding: '2px 2px',
+      overflow: 'hidden',
+    };
+  }
+  return {
+    fontSize: `${baseRem}rem`,
+    lineHeight: 1.2,
+    whiteSpace: 'nowrap',
+    padding: '4px 2px',
+    overflow: 'hidden',
+  };
+};
+
 export const MainArea: React.FC<MainAreaProps> = ({
   surveyType,
   selection,
@@ -1305,6 +1360,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
           }
 
           const { dragClass, cursorStyle, dragEvents } = getDragProps(`custom-${cat}`, btnConfig.id, isDisabled);
+          const adaptiveStyle = getAdaptiveButtonTextStyle(displayName, buttonStyle.fontSize);
 
           return (
             <button
@@ -1319,6 +1375,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               {...dragEvents}
               style={{
                 ...buttonStyle,
+                ...adaptiveStyle,
                 position: 'relative',
                 cursor: isDisabled ? 'not-allowed' : 'grab',
                 opacity: isDisabled ? 0.5 : 1,
@@ -1417,6 +1474,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
               );
             }
 
+            const adaptiveStyle = getAdaptiveButtonTextStyle(displayName, buttonStyle.fontSize);
+
             return (
               <button
                 key={customConfig.id}
@@ -1430,6 +1489,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 {...dragEvents}
                 style={{
                   ...buttonStyle,
+                  ...adaptiveStyle,
                   position: 'relative',
                   cursor: isDisabled ? 'not-allowed' : 'grab',
                   opacity: isDisabled ? 0.5 : 1,
@@ -1440,6 +1500,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </button>
             );
           } else {
+            const adaptiveStyle = getAdaptiveButtonTextStyle(btnName, buttonStyle.fontSize);
             if (cat === '場所') {
               const isSelected = activeLocation === btnName;
               return (
@@ -1455,6 +1516,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   {...dragEvents}
                   style={{
                     ...buttonStyle,
+                    ...adaptiveStyle,
                     fontWeight: 'bold',
                     cursor: isDisabled ? 'not-allowed' : 'grab',
                     opacity: isDisabled ? 0.5 : 1,
@@ -1479,6 +1541,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   {...dragEvents}
                   style={{
                     ...buttonStyle,
+                    ...adaptiveStyle,
                     cursor: isDisabled ? 'not-allowed' : 'grab',
                     opacity: isDisabled ? 0.5 : 1,
                     ...cursorStyle,
@@ -1503,6 +1566,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     {...dragEvents}
                     style={{
                       ...buttonStyle,
+                      ...adaptiveStyle,
                       fontWeight: 'bold',
                       cursor: isDisabled ? 'not-allowed' : 'grab',
                       opacity: isDisabled ? 0.5 : 1,
@@ -1530,6 +1594,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   {...dragEvents}
                   style={{
                     ...buttonStyle,
+                    ...adaptiveStyle,
                     cursor: isDisabled ? 'not-allowed' : 'grab',
                     opacity: isDisabled ? 0.5 : 1,
                     ...cursorStyle,

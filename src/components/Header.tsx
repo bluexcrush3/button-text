@@ -67,8 +67,8 @@ export const Header: React.FC<HeaderProps> = ({
               surveyType === '内部'
                 ? 'type-internal'
                 : surveyType === '傾斜'
-                ? 'type-inclination'
-                : 'type-external';
+                  ? 'type-inclination'
+                  : 'type-external';
             return (
               <button
                 key={tab.id}
@@ -163,7 +163,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="status-badges-group">
             <div className="status-badge" style={{ fontWeight: 'bold' }}>
               {activeTab.basicInfo.projectNumber ? `[${activeTab.basicInfo.projectNumber}] ` : ''}
-              家屋{String(activeTab.basicInfo.houseNumber).padStart(2, '0')}{activeTab.basicInfo.surveyNumber || ''} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
+              {activeTab.basicInfo.surveyDate ? `${activeTab.basicInfo.surveyDate} ` : ''}家屋{String(activeTab.basicInfo.houseNumber).padStart(2, '0')}{activeTab.basicInfo.surveyNumber || ''} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
             </div>
           </div>
 

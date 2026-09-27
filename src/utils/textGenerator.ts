@@ -1,4 +1,21 @@
-import { LineSelection, CustomButtonConfig, DamageItem } from '../types';
+import { LineSelection, CustomButtonConfig, DamageItem, BasicInfo, getTodayDateString } from '../types';
+
+/**
+ * 基本情報設定のヘッダー文字列を生成
+ * 仕様: 家屋番号(2桁数字のみ) ＋ 調査員名 ＋ 調査日付 ＋ 調査種別 ＋ 調査番号 ＋ フォルダ番号
+ * 例: 01 畦地 2026-09-27 外部 ① #100
+ */
+export function formatBasicInfoHeader(basicInfo?: BasicInfo): string {
+  if (!basicInfo) return '';
+  const houseStr = String(basicInfo.houseNumber || 1).padStart(2, '0');
+  const investigator = basicInfo.investigator || '';
+  const surveyDate = basicInfo.surveyDate || getTodayDateString();
+  const surveyType = basicInfo.surveyType || '';
+  const surveyNum = basicInfo.surveyNumber || '';
+  const folderNum = basicInfo.folderNumber ? `#${basicInfo.folderNumber}` : '';
+
+  return [houseStr, investigator, surveyDate, surveyType, surveyNum, folderNum].filter(Boolean).join(' ');
+}
 
 /**
  * 方向グループの2要素を結合表記に変換
@@ -379,7 +396,8 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
  */
 export function generateLineTextForSpreadsheet(
   selection: LineSelection,
-  customButtonsInput: CustomButtonsInput = []
+  customButtonsInput: CustomButtonsInput = [],
+  delimiter: string = '\t'
 ): string {
   const comp = getLineComponents(selection, customButtonsInput);
 
@@ -429,9 +447,9 @@ export function generateLineTextForSpreadsheet(
     // ・それ以外: 表示なし
     const line3Col2 = (val1 && val2) ? val2 : '';
 
-    const line1 = `${col1}\t${col2}\t${col3}\t\t\t${col6}`;
-    const line2 = `\t${line2Col2}\t\t\t\t`;
-    const line3 = `\t${line3Col2}\t\t\t\t`;
+    const line1 = [col1, col2, col3, '', '', col6].join(delimiter);
+    const line2 = ['', line2Col2, '', '', '', ''].join(delimiter);
+    const line3 = ['', line3Col2, '', '', '', ''].join(delimiter);
 
     return `${line1}\n${line2}\n${line3}`;
   }
@@ -522,7 +540,7 @@ export function generateLineTextForSpreadsheet(
     col5 = '';
   }
 
-  return `${col1}\t${col2}\t${col3}\t${col4}\t${col5}\t${col6}`;
+  return [col1, col2, col3, col4, col5, col6].join(delimiter);
 }
 
 export function generateLineText(

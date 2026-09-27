@@ -451,6 +451,12 @@ button.btn-danger:active {
   gap: 8px;
 }
 
+.button-grid .btn,
+.button-grid-3 .btn {
+  padding: 4px 2px;
+  box-sizing: border-box;
+}
+
 .action-btn-large {
   min-height: 64px;
   font-size: 1rem;

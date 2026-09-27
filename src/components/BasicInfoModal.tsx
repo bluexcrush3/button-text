@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BasicInfo, SurveyType, INVESTIGATOR_OPTIONS } from '../types';
+import { BasicInfo, SurveyType, INVESTIGATOR_OPTIONS, getTodayDateString } from '../types';
 import { Settings, Plus, Minus, Check, X } from 'lucide-react';
 
 interface BasicInfoModalProps {
@@ -15,11 +15,17 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
   basicInfo,
   onSave,
 }) => {
-  const [formData, setFormData] = useState<BasicInfo>(basicInfo);
+  const [formData, setFormData] = useState<BasicInfo>(() => ({
+    ...basicInfo,
+    surveyDate: basicInfo.surveyDate || getTodayDateString(),
+  }));
 
   useEffect(() => {
     if (isOpen) {
-      setFormData(basicInfo);
+      setFormData({
+        ...basicInfo,
+        surveyDate: basicInfo.surveyDate || getTodayDateString(),
+      });
     }
   }, [isOpen, basicInfo]);
 
@@ -162,9 +168,8 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
                 <button
                   key={type}
                   type="button"
-                  className={`toggle-btn ${
-                    formData.surveyType === type ? 'selected' : ''
-                  }`}
+                  className={`toggle-btn ${formData.surveyType === type ? 'selected' : ''
+                    }`}
                   onClick={() => handleSurveyTypeChange(type)}
                 >
                   {type}
@@ -181,15 +186,30 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
                 <button
                   key={num}
                   type="button"
-                  className={`toggle-btn ${
-                    formData.surveyNumber === num ? 'selected' : ''
-                  }`}
+                  className={`toggle-btn ${formData.surveyNumber === num ? 'selected' : ''
+                    }`}
                   onClick={() => handleSurveyNumberChange(num)}
                 >
                   {num}
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 調査日付 */}
+          <div className="form-group">
+            <label className="form-label">調査日付</label>
+            <input
+              type="date"
+              className="select-input"
+              value={formData.surveyDate || getTodayDateString()}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  surveyDate: e.target.value,
+                })
+              }
+            />
           </div>
 
           {/* 調査員名 */}

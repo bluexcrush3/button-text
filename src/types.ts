@@ -5,9 +5,19 @@ export interface BasicInfo {
   houseNumber: number;
   surveyType: SurveyType;
   surveyNumber?: string; // 調査番号（①～④）
+  surveyDate?: string;   // 調査日付 (YYYY-MM-DD)
   investigator: string;
   folderNumber: number;
 }
+
+export const getTodayDateString = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 
 /**
  * ① 場所グループデータ
@@ -85,7 +95,7 @@ export const INVESTIGATOR_OPTIONS = [
   '西村',
   '松本',
   '渡辺',
-  '松本拳',
+  '松山拳',
   '高橋',
   '井関',
   '山本',

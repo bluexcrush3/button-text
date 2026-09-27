@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TabData, BasicInfo, LineData, LineSelection, SurveyType, CustomButtonConfig } from './types';
+import { TabData, BasicInfo, LineData, LineSelection, SurveyType, CustomButtonConfig, getTodayDateString } from './types';
 import { Header } from './components/Header';
 import { MainArea } from './components/MainArea';
 import { BasicInfoModal } from './components/BasicInfoModal';
@@ -100,7 +100,8 @@ const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData 
       houseNumber: 1,
       surveyType: '外部',
       surveyNumber: '①',
-      investigator: '山本',
+      surveyDate: getTodayDateString(),
+      investigator: '畦地',
       folderNumber: 100,
     },
     lines: [createInitialLine(defaultMode)],
@@ -270,13 +271,13 @@ export const App: React.FC = () => {
     if (inheritBasicInfo && activeTab) {
       newBasicInfo = { ...activeTab.basicInfo };
     } else {
-      const maxHouseNum = Math.max(...tabs.map((t) => t.basicInfo.houseNumber), 0);
       newBasicInfo = {
-        projectNumber: activeTab?.basicInfo.projectNumber || '',
-        houseNumber: maxHouseNum + 1,
+        projectNumber: '',
+        houseNumber: 1,
         surveyType: '外部',
-        surveyNumber: activeTab?.basicInfo.surveyNumber || '①',
-        investigator: activeTab?.basicInfo.investigator || '山本',
+        surveyNumber: '①',
+        surveyDate: getTodayDateString(),
+        investigator: '畦地',
         folderNumber: 100,
       };
     }
@@ -519,6 +520,7 @@ export const App: React.FC = () => {
               external: externalCustomButtons,
               inclination: inclinationCustomButtons,
             }}
+            basicInfo={activeTab.basicInfo}
           />
         </>
       )}
@@ -538,7 +540,7 @@ export const App: React.FC = () => {
       <ConfirmModal
         isOpen={isAddTabModalOpen}
         title="新規タブ追加"
-        message="現在選択中のタブの「基本情報」（家屋番号・調査種別・調査員名・フォルダ番号）を新しいタブに引き継ぎますか？"
+        message="現在選択中のタブの「基本情報」（家屋番号・調査種別・調査日付・調査員名・フォルダ番号）を新しいタブに引き継ぎますか？"
         confirmText="引き継ぐ"
         cancelText="新規作成"
         onConfirm={() => handleAddTab(true)}
@@ -575,6 +577,7 @@ export const App: React.FC = () => {
             external: externalCustomButtons,
             inclination: inclinationCustomButtons,
           }}
+          basicInfo={activeTab.basicInfo}
         />
       )}
     </>

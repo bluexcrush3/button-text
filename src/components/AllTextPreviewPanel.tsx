@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { LineData, CustomButtonConfig } from '../types';
-import { generateLineText, generateLineTextForSpreadsheet, CustomButtonsInput } from '../utils/textGenerator';
+import { LineData, BasicInfo } from '../types';
+import { generateLineText, generateLineTextForSpreadsheet, formatBasicInfoHeader, CustomButtonsInput } from '../utils/textGenerator';
 import { FileText, Copy, Check, WrapText } from 'lucide-react';
+import { CopyFormatModal } from './CopyFormatModal';
 
 interface AllTextPreviewPanelProps {
     lines: LineData[];
     currentLineIndex: number;
     onNavigateToLine: (index: number) => void;
     customButtons?: CustomButtonsInput;
+    basicInfo?: BasicInfo;
 }
 
 export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
@@ -15,21 +17,29 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
     currentLineIndex,
     onNavigateToLine,
     customButtons = [],
+    basicInfo,
 }) => {
     const [copied, setCopied] = useState(false);
     const [isWrapText, setIsWrapText] = useState(false);
+    const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
 
     const lineTexts = lines.map((line) => generateLineText(line.selection, customButtons));
     const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
 
-    const handleCopy = async () => {
+    const handleSelectFormatAndCopy = async (delimiter: '\t' | ';') => {
         try {
-            const copyText = lines
-                .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons))
-                .filter((t, idx) => t.trim().length > 0 || lines[idx]?.selection.mode === '傾斜')
-                .join('\n');
+            const headerLine = formatBasicInfoHeader(basicInfo);
+            const lineTextsForCopy = lines
+                .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons, delimiter))
+                .filter((t, idx) => t.trim().length > 0 || lines[idx]?.selection.mode === '傾斜');
+
+            const copyText = headerLine
+                ? [headerLine, ...lineTextsForCopy].join('\n')
+                : lineTextsForCopy.join('\n');
+
             await navigator.clipboard.writeText(copyText);
             setCopied(true);
+            setIsCopyModalOpen(false);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
             console.error('Failed to copy text', err);
@@ -75,7 +85,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                     <button
                         type="button"
                         className="btn selected"
-                        onClick={handleCopy}
+                        onClick={() => setIsCopyModalOpen(true)}
                         disabled={!fullText}
                         style={{ padding: '4px 10px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
@@ -166,6 +176,12 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                     );
                 })}
             </div>
+
+            <CopyFormatModal
+                isOpen={isCopyModalOpen}
+                onClose={() => setIsCopyModalOpen(false)}
+                onSelectFormat={handleSelectFormatAndCopy}
+            />
         </section>
     );
 };

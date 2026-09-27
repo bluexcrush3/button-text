@@ -74,36 +74,24 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     };
   }, []);
 
-  // 現在選択されている損傷のリストとそのタイプを判定
-  const getActiveDamages = (): {
-    target: 'standard' | 'internal' | 'external';
-    items: DamageItem[];
-  } => {
+  // 現在選択されている損傷のリストを取得
+  const getActiveDamages = (): DamageItem[] => {
     const isInternal = (selection.mode || '外部') === '内部';
-
-    if (isInternal) {
-      if (selection.internalDamages && selection.internalDamages.length > 0) {
-        return { target: 'internal', items: selection.internalDamages };
-      }
-    } else {
-      if (selection.damages && selection.damages.length > 0) {
-        return { target: 'standard', items: selection.damages };
-      }
-      if (selection.externalDamages && selection.externalDamages.length > 0) {
-        return { target: 'external', items: selection.externalDamages };
-      }
-    }
-
-    // fallback
     if (selection.damages && selection.damages.length > 0) {
-      return { target: 'standard', items: selection.damages };
+      return selection.damages;
     }
-    return { target: 'standard', items: [] };
+    if (isInternal && selection.internalDamages && selection.internalDamages.length > 0) {
+      return selection.internalDamages;
+    }
+    if (!isInternal && selection.externalDamages && selection.externalDamages.length > 0) {
+      return selection.externalDamages;
+    }
+    return [];
   };
 
   // 音声認識結果の適用
   const handleApplyVoiceW = (rawTranscript: string) => {
-    const { target, items } = getActiveDamages();
+    const items = getActiveDamages();
     const damageCount = items.length;
 
     if (damageCount === 0) {
@@ -125,35 +113,32 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     }
 
     // 取得したW値を現在の損傷に適用
-    const newItems = [...items];
-    parseResult.damages.forEach((parsed, idx) => {
-      if (idx < newItems.length) {
-        newItems[idx] = {
-          ...newItems[idx],
+    const newItems = items.map((item, idx) => {
+      if (idx < parseResult.damages.length) {
+        const parsed = parseResult.damages[idx];
+        return {
+          ...item,
           valueW: parsed.valueW,
           preset: parsed.preset,
           isLessThan: parsed.isLessThan,
         };
       }
+      return item;
     });
 
-    // selection を更新
-    let newSelection: LineSelection;
-    if (target === 'internal') {
-      newSelection = {
-        ...selection,
-        internalDamages: newItems,
-      };
-    } else if (target === 'external') {
-      newSelection = {
-        ...selection,
-        externalDamages: newItems,
-      };
-    } else {
-      newSelection = {
-        ...selection,
-        damages: newItems,
-      };
+    const isInternal = (selection.mode || '外部') === '内部';
+    const isInclination = (selection.mode || '外部') === '傾斜';
+
+    // damages と internalDamages / externalDamages を全て同期更新
+    let newSelection: LineSelection = {
+      ...selection,
+      damages: newItems,
+    };
+
+    if (isInternal) {
+      newSelection.internalDamages = newItems;
+    } else if (!isInclination) {
+      newSelection.externalDamages = newItems;
     }
 
     onChangeSelection(newSelection);
@@ -177,7 +162,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
       return;
     }
 
-    const { items } = getActiveDamages();
+    const items = getActiveDamages();
     if (items.length === 0) {
       showFeedback(
         'warning',
@@ -303,7 +288,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
     }
   };
 
-  const { items } = getActiveDamages();
+  const items = getActiveDamages();
   const hasDamage = items.length > 0;
 
   return (
@@ -315,7 +300,7 @@ export const VoiceDamageWButton: React.FC<VoiceDamageWButtonProps> = ({
         onClick={handleToggleVoice}
         title={
           hasDamage
-            ? `W数値を音声入力（選択中: ${items.map((d) => d.name).join('、')}）`
+            ? `W数値を音声入力（選択中: ${items.map((d: DamageItem) => d.name).join('、')}）`
             : '損傷を選択すると音声でW数値を入力できます'
         }
         style={{

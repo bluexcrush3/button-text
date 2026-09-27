@@ -74,7 +74,7 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
     };
   }, []);
 
-  // 音声認識結果の適用（傾斜用: 損傷名の有無に関わらず数値を直接反映）
+  // 音声認識結果の適用（傾斜用: 方角ボタンと数値をまとめて反映）
   const handleApplyVoiceInclination = (rawTranscript: string) => {
     const parseResult = parseVoiceDamageW(rawTranscript, 2);
 
@@ -84,14 +84,53 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
       return;
     }
 
-    // 取得した数値を inclinationValues に格納
-    const newItems: DamageItem[] = parseResult.damages.map((parsed, idx) => ({
-      name: `傾斜${idx + 1}`,
-      valueW: parsed.valueW,
+    const currentValues = selection.inclinationValues || [];
+
+    const item0: DamageItem = {
+      name: '傾斜1',
+      valueW: currentValues[0]?.valueW || 0,
       valueL: 0,
-      preset: parsed.preset,
-      isLessThan: parsed.isLessThan,
-    }));
+      preset: currentValues[0]?.preset || null,
+      isLessThan: currentValues[0]?.isLessThan || false,
+      directions: currentValues[0]?.directions ? [...currentValues[0].directions] : [],
+    };
+
+    const item1: DamageItem = {
+      name: '傾斜2',
+      valueW: currentValues[1]?.valueW || 0,
+      valueL: 0,
+      preset: currentValues[1]?.preset || null,
+      isLessThan: currentValues[1]?.isLessThan || false,
+      directions: currentValues[1]?.directions ? [...currentValues[1].directions] : [],
+    };
+
+    const newItems: DamageItem[] = [item0, item1];
+
+    parseResult.damages.forEach((parsed, idx) => {
+      const parsedDirs = parsed.directions || [];
+      const hasSN = parsedDirs.includes('南') || parsedDirs.includes('北');
+      const hasEW = parsedDirs.includes('東') || parsedDirs.includes('西');
+
+      let targetIdx = idx;
+      if (hasSN && !hasEW) {
+        targetIdx = 0; // 南北
+      } else if (hasEW && !hasSN) {
+        targetIdx = 1; // 東西
+      }
+
+      if (targetIdx < 2) {
+        const isBoth = (parsedDirs.includes('南') && parsedDirs.includes('北')) ||
+          (parsedDirs.includes('東') && parsedDirs.includes('西'));
+
+        newItems[targetIdx] = {
+          ...newItems[targetIdx],
+          valueW: isBoth ? 0 : parsed.valueW,
+          preset: parsed.preset,
+          isLessThan: parsed.isLessThan,
+          directions: parsedDirs.length > 0 ? parsedDirs : newItems[targetIdx].directions,
+        };
+      }
+    });
 
     onChangeSelection({
       ...selection,
@@ -102,9 +141,14 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
 
     const formattedFeedback = newItems
       .map((item, idx) => {
+        const dirsStr = item.directions && item.directions.length > 0
+          ? item.directions.join('')
+          : (idx === 0 ? '南北' : '東西');
         const prefix = item.isLessThan ? '<' : '';
-        const valStr = item.preset ? `【${item.preset}】` : `${prefix}${item.valueW}`;
-        return `傾斜${idx + 1}: ${valStr}`;
+        const isBoth = (item.directions?.includes('南') && item.directions?.includes('北')) ||
+          (item.directions?.includes('東') && item.directions?.includes('西'));
+        const valStr = isBoth ? '±0' : item.preset ? `【${item.preset}】` : `${prefix}${item.valueW}`;
+        return `傾斜${idx + 1}(${dirsStr}): ${valStr}`;
       })
       .join(' / ');
 
@@ -147,30 +191,44 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
         isListeningRef.current = true;
         setInterimText('');
         lastTranscriptRef.current = '';
-        showFeedback('info', '傾斜値を話してください', '例:「2.5」「1.0と2.0」「以下1.0」「クリア」', 0, true);
+        showFeedback('info', '傾斜値を話してください', '例:「北1.0と西2.0 確定」「南1.5」「南北0 西1.0」', 0, true);
       };
 
       recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
+        if (!isListeningRef.current) return;
 
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const trans = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            final += trans;
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0].transcript;
           } else {
-            interim += trans;
+            interimTranscript += result[0].transcript;
           }
         }
 
-        const currentText = (final || interim).trim();
-        setInterimText(currentText);
-        if (currentText) {
-          lastTranscriptRef.current = currentText;
-        }
+        const combined = (finalTranscript + interimTranscript).trim();
+        if (combined) {
+          lastTranscriptRef.current = combined;
+          setInterimText(combined);
 
-        if (final) {
-          handleApplyVoiceInclination(final);
+          const parseResult = parseVoiceDamageW(combined, 2);
+
+          showFeedback(
+            'info',
+            `🎙️ 『${combined}』`,
+            parseResult.success
+              ? `【認識】${parseResult.feedbackText} （「確定」または「以上」で終了）`
+              : '「確定」「以上」で終了します',
+            0,
+            true
+          );
+
+          if (parseResult.hasEndCommand) {
+            handleApplyVoiceInclination(combined);
+          }
         }
       };
 
@@ -250,15 +308,14 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
             right: '0',
             zIndex: 1000,
             backgroundColor: '#ffffff',
-            border: `1.5px solid ${
-              feedback.type === 'success'
+            border: `1.5px solid ${feedback.type === 'success'
                 ? '#22c55e'
                 : feedback.type === 'error'
                   ? '#ef4444'
                   : feedback.type === 'warning'
                     ? '#f59e0b'
                     : '#3b82f6'
-            }`,
+              }`,
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             padding: '8px 12px',

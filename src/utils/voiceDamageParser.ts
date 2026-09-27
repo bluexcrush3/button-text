@@ -6,6 +6,7 @@ export interface ParsedDamageW {
   valueW: number;
   preset: '全体' | '全般' | '多数' | null;
   isLessThan?: boolean;
+  directions?: string[];
 }
 
 export interface VoiceDamageParseResult {
@@ -18,7 +19,7 @@ export interface VoiceDamageParseResult {
 
 /** 終了を知らせるボイスコマンドキーワード */
 export const VOICE_END_COMMANDS_REGEX =
-  /(?:確定|かくてい|決定|けってい|以上|いじょう|完了|かんりょう|終わり|おわり|登録|とうろく|ストップ|すっとっぷ|オーケー|OK)$/i;
+  /(?:確定|かくてい|決定|けってい|以上|いじょう|完了|かんりょう|終わり|おわり|登録|とうろく|ストップ|すっとっぷ|オーケー|OK)[\s。！!]*$/i;
 
 /**
  * 漢数字・全角数字・ひらがなの数詞・小数点を半角アラビア数字文字列に変換する
@@ -45,8 +46,32 @@ export function normalizeJapaneseNumbers(text: string): string {
   s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:はち|八|8)/gi, '0.8');
   s = s.replace(/(?:ゼロ|ぜろ|零|0)\s*(?:点|てん)\s*(?:きゅう|九|9)/gi, '0.9');
 
-  // 数字 + 点/てん + 数字 (例: "1点5" -> "1.5", "0点25" -> "0.25")
-  s = s.replace(/(\d+)\s*(?:点|てん)\s*(\d+)/gi, '$1.$2');
+  // 漢数字・全角数字・カタカナ数詞の変換
+  s = s.replace(/零|ゼロ/g, '0');
+  s = s.replace(/一|イチ/g, '1');
+  s = s.replace(/二|ニ/g, '2');
+  s = s.replace(/三|サン/g, '3');
+  s = s.replace(/四|ヨン/g, '4');
+  s = s.replace(/五|ゴ/g, '5');
+  s = s.replace(/六|ロク/g, '6');
+  s = s.replace(/七|ナナ/g, '7');
+  s = s.replace(/八|ハチ/g, '8');
+  s = s.replace(/九|キュウ/g, '9');
+
+  // ひらがな単独数詞の安全な置換（「以下」「以上」等の「い」の誤置換を防止）
+  s = s.replace(/(^|[\s,、と])ぜろ(?=[\s,、と点てんつ個番]|$)/gi, '$10');
+  s = s.replace(/(^|[\s,、と])いち(?=[\s,、と点てんつ個番]|$)/gi, '$11');
+  s = s.replace(/(^|[\s,、と])に(?=[\s,、と点てんつ個番]|$)/gi, '$12');
+  s = s.replace(/(^|[\s,、と])さん(?=[\s,、と点てんつ個番]|$)/gi, '$13');
+  s = s.replace(/(^|[\s,、と])よん(?=[\s,、と点てんつ個番]|$)/gi, '$14');
+  s = s.replace(/(^|[\s,、と])ご(?=[\s,、と点てんつ個番]|$)/gi, '$15');
+  s = s.replace(/(^|[\s,、と])ろく(?=[\s,、と点てんつ個番]|$)/gi, '$16');
+  s = s.replace(/(^|[\s,、と])(?:なな|しち)(?=[\s,、と点てんつ個番]|$)/gi, '$17');
+  s = s.replace(/(^|[\s,、と])はち(?=[\s,、と点てんつ個番]|$)/gi, '$18');
+  s = s.replace(/(^|[\s,、と])きゅう(?=[\s,、と点てんつ個番]|$)/gi, '$19');
+
+  // 数字 + (点/てん/カンマ/読点) + 数字 (例: "1点5" -> "1.5", "1,0" -> "1.0", "1、0" -> "1.0")
+  s = s.replace(/(\d+)\s*(?:点|てん|[,、])\s*(\d+)/gi, '$1.$2');
 
   // 単独の ".3" や ".5" を "0.3", "0.5" に補正
   s = s.replace(/(^|[^\d])\.(\d+)/g, '$1 0.$2');
@@ -54,18 +79,6 @@ export function normalizeJapaneseNumbers(text: string): string {
   // マイナスの読み ("マイナス", "まいなす", "−", "―", "ー", "‐")
   s = s.replace(/(?:マイナス|まいなす|−|―|ー|‐)\s*(\d)/gi, '-$1');
   s = s.replace(/(?:マイナス|まいなす)\s+/gi, '-');
-
-  // 単一の漢数字/カタカナ/ひらがな数詞変換 (安全な文脈で置換)
-  s = s.replace(/零|ゼロ|ぜろ/g, '0');
-  s = s.replace(/一|イチ|いち/g, '1');
-  s = s.replace(/二|ニ|に/g, '2');
-  s = s.replace(/三|サン|さん/g, '3');
-  s = s.replace(/四|ヨン|よん/g, '4');
-  s = s.replace(/五|ゴ|ご/g, '5');
-  s = s.replace(/六|ロク|ろく/g, '6');
-  s = s.replace(/七|ナナ|なな|しち/g, '7');
-  s = s.replace(/八|ハチ|はち/g, '8');
-  s = s.replace(/九|キュウ|きゅう/g, '9');
 
   return s;
 }
@@ -79,14 +92,30 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
 
   const isLessThan = /(?:以下|いか|未満|みまん|<|＜)/i.test(cleaned);
 
+  // 方角の抽出 (南, 北, 東, 西, 南北0, 東西0, 南北±0, 東西±0 など)
+  const directions: string[] = [];
+  if (/(?:南北0|南北±0|南北ゼロ|南北ぜろ)/i.test(cleaned)) {
+    directions.push('南', '北');
+  } else {
+    if (/南/i.test(cleaned)) directions.push('南');
+    if (/北/i.test(cleaned)) directions.push('北');
+  }
+
+  if (/(?:東西0|東西±0|東西ゼロ|東西ぜろ)/i.test(cleaned)) {
+    directions.push('東', '西');
+  } else {
+    if (/東/i.test(cleaned)) directions.push('東');
+    if (/西/i.test(cleaned)) directions.push('西');
+  }
+
   // 1. クリア / ゼロ / なし
   if (/^(?:クリア|リセット|ゼロ|なし|消去|0)$/i.test(cleaned)) {
-    return { valueW: 0, preset: null, isLessThan: false };
+    return { valueW: 0, preset: null, isLessThan: false, directions };
   }
 
   // 2. プリセット: 全体 / 全般
   if (/(?:全体|ぜんたい|全般|ぜんぱん)/i.test(cleaned)) {
-    return { valueW: 0, preset: '全体', isLessThan: false };
+    return { valueW: 0, preset: '全体', isLessThan: false, directions };
   }
 
   // 3. プリセット: 多数チェック
@@ -94,7 +123,7 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
 
   // 4. 50
   if (/\b50\b|50/.test(cleaned)) {
-    return { valueW: 50, preset: hasTasu ? '多数' : null, isLessThan: false };
+    return { valueW: 50, preset: hasTasu ? '多数' : null, isLessThan: false, directions };
   }
 
   // 5. 数値（マイナス・小数含む）の抽出 (例: -1.0, 0.3, 1.5, 2, 0.25 など)
@@ -102,13 +131,18 @@ function parseSingleDamageItem(segment: string): ParsedDamageW | null {
   if (numMatch) {
     const val = parseFloat(numMatch[0]);
     if (!isNaN(val)) {
-      return { valueW: val, preset: hasTasu ? '多数' : null, isLessThan };
+      return { valueW: val, preset: hasTasu ? '多数' : null, isLessThan, directions };
     }
   }
 
-  // 6. 数値がなく多数のみの場合
+  // 6. 方角指定のみ（数値指定なし）の場合は数値0として返す
+  if (directions.length > 0) {
+    return { valueW: 0, preset: null, isLessThan: false, directions };
+  }
+
+  // 7. 数値がなく多数のみの場合
   if (hasTasu) {
-    return { valueW: 0, preset: '多数', isLessThan: false };
+    return { valueW: 0, preset: '多数', isLessThan: false, directions };
   }
 
   return null;
@@ -153,6 +187,10 @@ export function parseVoiceDamageW(
   text = text.replace(/数値|すうち|あたい|値|寸法/gi, ' ');
   text = text.replace(/です|ます|登録|設定|入力|お願い|にして|で/gi, ' ');
 
+  // 方角キーワードと数値の間のスペースを詰める (例: 「北 1.0」 -> 「北1.0」)
+  text = text.replace(/(南|北|東|西|南北|東西)\s*[:：はがで]?\s*(\d)/gi, '$1$2');
+  text = text.replace(/(南|北|東|西|南北|東西)\s*[:：はがで]?\s*(マイナス|まいなす|-|―|ー)/gi, '$1$2');
+
   // 「以下 1.0」や「1.0 以下」のように数値とキーワードの間にスペースがある場合、結合して分離を防止
   text = text.replace(/(以下|いか|未満|みまん|<|＜)\s+(\d)/gi, '$1$2');
   text = text.replace(/(\d+)\s+(以下|いか|未満|みまん|<|＜)/gi, '$1$2');
@@ -175,9 +213,9 @@ export function parseVoiceDamageW(
     }
   }
 
-  // 2. 「1つ目/1番/左/上/前」「2つ目/2番/右/下/後」などの明確な位置・順番指定の抽出
-  const firstMatch = text.match(/(?:1つ目|1つめ|1個目|1個め|1番目|1番|ひとつめ|左|上|前)\s*[:：はがで]?\s*([^2２ふた右上後]+)/);
-  const secondMatch = text.match(/(?:2つ目|2つめ|2個目|2個め|2番目|2番|ふたつめ|右|下|後)\s*[:：はがで]?\s*(.+)/);
+  // 2. 「1つ目/1番/左/上/前」「2つ目/2番/右/下/後」などの明確な位置・順番指定の抽出（「以下」「以上」の「上」「下」を誤誤検知しないよう負の戻り読みを使用）
+  const firstMatch = text.match(/(?:1つ目|1つめ|1個目|1個め|1番目|1番|ひとつめ|左|(?<!以)上|前)\s*[:：はがで]?\s*([^2２ふた右上後]+)/);
+  const secondMatch = text.match(/(?:2つ目|2つめ|2個目|2個め|2番目|2番|ふたつめ|右|(?<!以)下|後)\s*[:：はがで]?\s*(.+)/);
   if (firstMatch || secondMatch) {
     const item1 = firstMatch ? parseSingleDamageItem(firstMatch[1]) : null;
     const item2 = secondMatch ? parseSingleDamageItem(secondMatch[1]) : null;
@@ -202,7 +240,7 @@ export function parseVoiceDamageW(
   const parsedItems: ParsedDamageW[] = [];
 
   // 区切り文字（「と」「、」「,」「スペース」「および」「アンド」「&」「/」）による分割
-  const splitPattern = /(?:[\s,、\/／&]+|(?<=[^\d])と(?=[^\d])|(?<=\d)と(?=\d)|および|アンド)+/;
+  const splitPattern = /(?:[\s,、\/／&]+|(?<=[\d.\s南北京東西])と|と(?=[\d.\s南北京東西マイナス−―ー‐])|および|アンド)+/;
   const parts = text.split(splitPattern).filter(Boolean);
 
   for (let i = 0; i < parts.length; i++) {
@@ -263,20 +301,26 @@ export function parseVoiceDamageW(
  */
 function formatFeedbackText(items: ParsedDamageW[]): string {
   const formatItem = (item: ParsedDamageW) => {
-    if (item.preset === '全体' || item.preset === '全般') return `【全体】`;
+    const dirsStr = item.directions && item.directions.length > 0 ? item.directions.join('') : '';
+    const dirLabel = dirsStr ? `(${dirsStr})` : '';
+
+    if (item.preset === '全体' || item.preset === '全般') return `${dirLabel}【全体】`;
     const prefix = item.isLessThan ? '<' : '';
-    const numPart = item.valueW !== 0 ? `W = ${prefix}${item.valueW}` : '';
+    const isBoth = (item.directions?.includes('南') && item.directions?.includes('北')) ||
+      (item.directions?.includes('東') && item.directions?.includes('西'));
+    if (isBoth) return `${dirsStr}±0`;
+    const numPart = item.valueW !== 0 ? `W = ${dirsStr}${prefix}${item.valueW}` : '';
     if (item.preset === '多数') {
-      return numPart ? `${numPart} 多数` : `【多数】`;
+      return numPart ? `${numPart} 多数` : `${dirLabel}【多数】`;
     }
-    return numPart || `W = 0`;
+    return numPart || `${dirLabel}W = 0`;
   };
 
   if (items.length === 1) {
     return `損傷1: ${formatItem(items[0])}`;
   }
   return items
-    .map((item, idx) => `損傷${idx + 1}: ${formatItem(item)}`)
+    .map((item, idx) => `傾斜${idx + 1}: ${formatItem(item)}`)
     .join(' / ');
 }
 

@@ -122,12 +122,17 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
         const isBoth = (parsedDirs.includes('南') && parsedDirs.includes('北')) ||
           (parsedDirs.includes('東') && parsedDirs.includes('西'));
 
+        // 数値1 (targetIdx=0) は南北のみ、数値2 (targetIdx=1) は東西のみに方角を限定
+        const allowedDirs = targetIdx === 0
+          ? parsedDirs.filter((d) => d === '南' || d === '北')
+          : parsedDirs.filter((d) => d === '東' || d === '西');
+
         newItems[targetIdx] = {
           ...newItems[targetIdx],
           valueW: isBoth ? 0 : parsed.valueW,
           preset: parsed.preset,
           isLessThan: parsed.isLessThan,
-          directions: parsedDirs.length > 0 ? parsedDirs : newItems[targetIdx].directions,
+          directions: allowedDirs.length > 0 ? allowedDirs : newItems[targetIdx].directions,
         };
       }
     });

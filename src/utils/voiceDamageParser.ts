@@ -61,17 +61,17 @@ export function normalizeJapaneseNumbers(text: string): string {
   s = s.replace(/八|ハチ/g, '8');
   s = s.replace(/九|キュウ/g, '9');
 
-  // ひらがな単独数詞の安全な置換（「以下」「以上」等の「い」の誤置換を防止）
-  s = s.replace(/(^|[\s,、と])ぜろ(?=[\s,、と点てんつ個番]|$)/gi, '$10');
-  s = s.replace(/(^|[\s,、と])いち(?=[\s,、と点てんつ個番]|$)/gi, '$11');
-  s = s.replace(/(^|[\s,、と])に(?=[\s,、と点てんつ個番]|$)/gi, '$12');
-  s = s.replace(/(^|[\s,、と])さん(?=[\s,、と点てんつ個番]|$)/gi, '$13');
-  s = s.replace(/(^|[\s,、と])よん(?=[\s,、と点てんつ個番]|$)/gi, '$14');
-  s = s.replace(/(^|[\s,、と])ご(?=[\s,、と点てんつ個番]|$)/gi, '$15');
-  s = s.replace(/(^|[\s,、と])ろく(?=[\s,、と点てんつ個番]|$)/gi, '$16');
-  s = s.replace(/(^|[\s,、と])(?:なな|しち)(?=[\s,、と点てんつ個番]|$)/gi, '$17');
-  s = s.replace(/(^|[\s,、と])はち(?=[\s,、と点てんつ個番]|$)/gi, '$18');
-  s = s.replace(/(^|[\s,、と])きゅう(?=[\s,、と点てんつ個番]|$)/gi, '$19');
+  // ひらがな単独数詞の安全な置換（「以下」「以上」等の「い」の誤置換を防止。方角直後も許可）
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))ぜろ(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$10');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))いち(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$11');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))に(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$12');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))さん(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$13');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))よん(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$14');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))ご(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$15');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))ろく(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$16');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))(?:なな|しち)(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$17');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))はち(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$18');
+  s = s.replace(/(^|[\s,、と]|(?<=[南北京東西]))きゅう(?=[\s,、と点てんつ個番]|$|\d|[南北京東西])/gi, '$19');
 
   // 数字 + (点/てん/カンマ/読点) + 数字 (例: "1点5" -> "1.5", "1,0" -> "1.0", "1、0" -> "1.0")
   s = s.replace(/(\d+)\s*(?:点|てん|[,、])\s*(\d+)/gi, '$1.$2');
@@ -196,6 +196,8 @@ export function parseVoiceDamageW(
 
   // 「北1西3」のように方角+数値が連続している場合、分割できるようにスペースを挿入
   text = text.replace(/(\d)(南|北|東|西|南北|東西)/gi, '$1 $2');
+  // 「北西」「南東」のように南北方角と東西方角が連続している場合も分割できるようにスペースを挿入
+  text = text.replace(/(南|北|南北0|南北±0|南北)\s*(東|西|東西0|東西±0|東西)/gi, '$1 $2');
 
 
   // 「以下 1.0」や「1.0 以下」のように数値とキーワードの間にスペースがある場合、結合して分離を防止
@@ -285,11 +287,25 @@ export function parseVoiceDamageW(
   }
 
   if (parsedItems.length > 0) {
+    // もし1つの項目に南北と東西の両方が含まれている場合、2つの項目に分離する
+    const finalItems: ParsedDamageW[] = [];
+    for (const item of parsedItems) {
+      const dirs = item.directions || [];
+      const snDirs = dirs.filter((d) => d === '南' || d === '北');
+      const ewDirs = dirs.filter((d) => d === '東' || d === '西');
+      if (snDirs.length > 0 && ewDirs.length > 0) {
+        finalItems.push({ ...item, directions: snDirs });
+        finalItems.push({ ...item, directions: ewDirs });
+      } else {
+        finalItems.push(item);
+      }
+    }
+
     return {
       success: true,
-      damages: parsedItems,
+      damages: finalItems.slice(0, damageCount >= 2 ? 2 : 1),
       rawText: rawTranscript,
-      feedbackText: formatFeedbackText(parsedItems),
+      feedbackText: formatFeedbackText(finalItems.slice(0, damageCount >= 2 ? 2 : 1)),
       hasEndCommand,
     };
   }

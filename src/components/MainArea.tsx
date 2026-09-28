@@ -477,9 +477,10 @@ export const MainArea: React.FC<MainAreaProps> = ({
       list.push({ name: `傾斜${list.length + 1}`, valueW: 0, valueL: 0 });
     }
     const curVal = list[index].valueW || 0;
+    const newVal = curVal + delta;
     list[index] = {
       ...list[index],
-      valueW: parseFloat((curVal + delta).toFixed(1)),
+      valueW: Number.isInteger(newVal) ? newVal : parseFloat(newVal.toFixed(1)),
     };
     updateInclinationValues(list);
   };
@@ -506,12 +507,12 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (curVal === 0) {
       list[index] = {
         ...list[index],
-        valueW: -1.0,
+        valueW: -1,
       };
     } else {
       list[index] = {
         ...list[index],
-        valueW: parseFloat((-curVal).toFixed(1)),
+        valueW: -curVal,
       };
     }
     updateInclinationValues(list);
@@ -2808,15 +2809,15 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     <button
                       type="button"
                       className="btn stepper-btn"
-                      onClick={() => handleInclinationValueChange(idx, -1.0)}
+                      onClick={() => handleInclinationValueChange(idx, -1)}
                       disabled={isBoth}
                       style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold', cursor: isBoth ? 'not-allowed' : 'pointer' }}
                     >
-                      -1.0
+                      -1
                     </button>
                     <input
                       type="number"
-                      step="0.1"
+                      step="1"
                       className="stepper-input"
                       disabled={isBoth}
                       value={isBoth ? '' : (item.valueW !== undefined && item.valueW !== 0 ? item.valueW : (item.valueW === 0 ? '' : item.valueW))}
@@ -2837,11 +2838,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     <button
                       type="button"
                       className="btn stepper-btn"
-                      onClick={() => handleInclinationValueChange(idx, 1.0)}
+                      onClick={() => handleInclinationValueChange(idx, 1)}
                       disabled={isBoth}
                       style={{ flex: 1, height: '36px', padding: 0, fontSize: '0.85rem', fontWeight: 'bold', cursor: isBoth ? 'not-allowed' : 'pointer' }}
                     >
-                      +1.0
+                      +1
                     </button>
                   </div>
                 </div>

@@ -359,7 +359,7 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
     const wPrefix = item.isLessThan ? '<' : '';
 
     if (wVal !== 0) {
-      return `${dirPrefix}${wPrefix}${formatDamageValue(wVal)}㎜/M`;
+      return `${dirPrefix}${wPrefix}${wVal}㎜/M`;
     }
     if (dirPrefix) {
       return `${dirPrefix}0㎜/M`;

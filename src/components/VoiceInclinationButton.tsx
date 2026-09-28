@@ -191,7 +191,7 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
         isListeningRef.current = true;
         setInterimText('');
         lastTranscriptRef.current = '';
-        showFeedback('info', '傾斜値を話してください', '例:「北1.0と西2.0 確定」「南1.5」「南北0 西1.0」', 0, true);
+        showFeedback('info', '傾斜値を話してください', '例:「北1㎜/Mと西2㎜/M 確定」「南1」「南北0 西2」', 0, true);
       };
 
       recognition.onresult = (event: any) => {
@@ -269,7 +269,7 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
         type="button"
         className={`btn-copy-prev voice-w-btn ${isListening ? 'listening' : ''}`}
         onClick={handleToggleVoice}
-        title={isListening ? 'タップして確定・終了' : '音声で傾斜数値を入力（例: 2.5 / 1.0と2.0）'}
+        title={isListening ? 'タップして確定・終了' : '音声で傾斜数値を入力（例: 北1㎜/M / 西2㎜/M）'}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -309,12 +309,12 @@ export const VoiceInclinationButton: React.FC<VoiceInclinationButtonProps> = ({
             zIndex: 1000,
             backgroundColor: '#ffffff',
             border: `1.5px solid ${feedback.type === 'success'
-                ? '#22c55e'
-                : feedback.type === 'error'
-                  ? '#ef4444'
-                  : feedback.type === 'warning'
-                    ? '#f59e0b'
-                    : '#3b82f6'
+              ? '#22c55e'
+              : feedback.type === 'error'
+                ? '#ef4444'
+                : feedback.type === 'warning'
+                  ? '#f59e0b'
+                  : '#3b82f6'
               }`,
             borderRadius: '8px',
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',

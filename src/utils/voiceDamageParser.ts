@@ -186,7 +186,7 @@ export function parseVoiceDamageW(
 
   // 不要語の除去
   text = text.replace(/ダブリュー|ダブル|だぶりゅー|\bW\b|\bw\b|幅|はば|巾/gi, ' ');
-  text = text.replace(/ミリ|mm|センチ|cm|メートル|m/gi, ' ');
+  text = text.replace(/ミリメートル|ミリ毎メートル|毎メートル|㎜\/M|㎜\/m|mm\/m|㎜|ミリ|mm|センチ|cm|メートル|\bM\b|\bm\b/gi, ' ');
   text = text.replace(/数値|すうち|あたい|値|寸法/gi, ' ');
   text = text.replace(/です|ます|登録|設定|入力|お願い|にして|で/gi, ' ');
 

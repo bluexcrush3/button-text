@@ -55,6 +55,10 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                 backgroundColor: '#ffffff',
                 padding: '12px',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
             }}
         >
             <div
@@ -65,6 +69,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                     marginBottom: '8px',
                     paddingBottom: '6px',
                     borderBottom: '1px solid #eee',
+                    flexShrink: 0,
                 }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold', fontSize: '0.95rem' }}>
@@ -100,8 +105,9 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '6px',
-                    maxHeight: '220px',
+                    flex: 1,
                     overflowY: 'auto',
+                    minHeight: 0,
                     backgroundColor: '#f8f9fa',
                     padding: '6px',
                     borderRadius: '6px',
@@ -111,6 +117,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                 {lines.map((line, idx) => {
                     const text = lineTexts[idx];
                     const isCurrent = idx === currentLineIndex;
+                    const isLast = idx === lines.length - 1;
 
                     return (
                         <div
@@ -127,6 +134,14 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                                 justifyContent: 'space-between',
                                 gap: '8px',
                                 transition: 'all 0.15s ease',
+                                // 最終行: 常にリスト最下部に貼り付く
+                                ...(isLast ? {
+                                    position: 'sticky',
+                                    bottom: 0,
+                                    marginTop: 'auto',
+                                    zIndex: 2,
+                                    boxShadow: '0 -2px 6px rgba(0,0,0,0.08)',
+                                } : {}),
                             }}
                         >
                             <span

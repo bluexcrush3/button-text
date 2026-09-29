@@ -50,6 +50,10 @@ export const Header: React.FC<HeaderProps> = ({
   const currentLine = activeTab?.lines[activeTab.currentLineIndex];
   const currentLineText = currentLine ? generateLineText(currentLine.selection, customButtons) : '';
 
+  const prevLineIndex = (activeTab?.currentLineIndex || 0) - 1;
+  const prevLine = prevLineIndex >= 0 ? activeTab?.lines[prevLineIndex] : null;
+  const prevLineText = prevLine ? generateLineText(prevLine.selection, customButtons) : '';
+
   const totalLines = activeTab?.lines.length || 1;
   const currentLineNum = (activeTab?.currentLineIndex || 0) + 1;
   const currentMode = currentSelection?.mode || activeTab?.basicInfo.surveyType || '外部';
@@ -113,7 +117,28 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2行目: テキスト表示エリア単体 */}
+      {/* 2行目: 1つ前のページのテキスト表示（1ページ目は非表示） */}
+      {prevLine && (
+        <div className="header-row-text">
+          <div
+            className="generated-text-box"
+            style={{
+              width: '100%',
+              opacity: 0.45,
+              color: '#888',
+              backgroundColor: '#f5f5f5',
+              pointerEvents: 'none',
+              userSelect: 'none',
+              fontStyle: 'italic',
+            }}
+            title={`前のページ: ${prevLineText || '（未入力）'}`}
+          >
+            {prevLineText || <span style={{ color: '#bbb', fontWeight: 'normal' }}>（未入力）</span>}
+          </div>
+        </div>
+      )}
+
+      {/* 3行目: テキスト表示エリア単体（現在のページ） */}
       <div className="header-row-text">
         <div className="generated-text-box" style={{ width: '100%' }}>
           {currentLineText || <span style={{ color: '#aaa', fontWeight: 'normal' }}>（ボタンを選択してください）</span>}

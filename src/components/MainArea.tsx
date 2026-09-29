@@ -124,9 +124,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
     selection.location.selectedLocation ?? (selection.location.isBuilding ? '建物' : null);
   const isFloorDisabled = activeLocation === '塀' || activeLocation === '土間';
 
-  // ② 場所グループハンドラー（1つのみ選択）
+  // ② 場所グループハンドラー（1つのみ選択・ラジオボタン）
   const handleLocationToggle = (locName: string) => {
     const nextLoc = activeLocation === locName ? null : locName;
+
+    // カスタム「場所」ボタンの選択名一覧（カスタムボタン設定から取得）
+    const customLocationNames = new Set(
+      [...internalCustomButtons, ...externalCustomButtons, ...inclinationCustomButtons]
+        .filter((b) => b.category === '場所' && !b.isVoice && b.name !== '音声入力')
+        .map((b) => b.name)
+    );
+
+    // カスタム場所の選択を除去（ラジオ動作）
+    const clearCustomLocation = (selections: string[]) =>
+      selections.filter(
+        (item) =>
+          !customLocationNames.has(item) &&
+          ![...customLocationNames].some((cn) => item.startsWith(cn) && /[①-⑳]$/.test(item))
+      );
+
     onChangeSelection({
       ...selection,
       location: {
@@ -134,6 +150,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
         selectedLocation: nextLoc,
         isBuilding: nextLoc === '建物',
       },
+      internalSelections: clearCustomLocation(selection.internalSelections || []),
+      externalSelections: clearCustomLocation(selection.externalSelections || []),
+      inclinationSelections: clearCustomLocation(selection.inclinationSelections || []),
     });
   };
 
@@ -712,39 +731,61 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (!locationModalBtn) return;
 
     const baseName = locationModalBtn.name;
-    const existingIndex = currentCustomSelections.findIndex(
-      (item) => item === baseName || (item.startsWith(baseName) && /[①-⑳]$/.test(item))
+
+    // カスタム「場所」ボタンの名前一覧（重複排除）
+    const customLocationNames = new Set(
+      [...internalCustomButtons, ...externalCustomButtons, ...inclinationCustomButtons]
+        .filter((b) => b.category === '場所' && !b.isVoice && b.name !== '音声入力')
+        .map((b) => b.name)
     );
 
-    let next = [...currentCustomSelections];
+    // 既存のカスタム場所選択を全て除去してラジオ動作を実現
+    const removeAllCustomLocations = (selections: string[]) =>
+      selections.filter(
+        (item) =>
+          !customLocationNames.has(item) &&
+          ![...customLocationNames].some((cn) => item.startsWith(cn) && /[①-⑳]$/.test(item))
+      );
 
-    if (suffix === null) {
-      if (existingIndex !== -1) {
-        next.splice(existingIndex, 1);
-      }
-    } else {
-      const newName = `${baseName}${suffix}`;
-      if (existingIndex !== -1) {
-        next[existingIndex] = newName;
+    const makeNext = (selections: string[]) => {
+      const cleaned = removeAllCustomLocations(selections);
+      if (suffix === null) {
+        // 選択解除
+        return cleaned;
       } else {
-        next.push(newName);
+        const newName = `${baseName}${suffix}`;
+        return [...cleaned, newName];
       }
-    }
+    };
+
+    // 固定場所ボタンの選択もクリア（ラジオ動作）
+    const nextLocation = suffix !== null
+      ? { ...selection.location, selectedLocation: null, isBuilding: false }
+      : selection.location;
 
     if (isModeInternal) {
       onChangeSelection({
         ...selection,
-        internalSelections: next,
+        location: nextLocation,
+        internalSelections: makeNext(selection.internalSelections || []),
+        externalSelections: removeAllCustomLocations(selection.externalSelections || []),
+        inclinationSelections: removeAllCustomLocations(selection.inclinationSelections || []),
       });
     } else if (isModeInclination) {
       onChangeSelection({
         ...selection,
-        inclinationSelections: next,
+        location: nextLocation,
+        internalSelections: removeAllCustomLocations(selection.internalSelections || []),
+        externalSelections: removeAllCustomLocations(selection.externalSelections || []),
+        inclinationSelections: makeNext(selection.inclinationSelections || []),
       });
     } else {
       onChangeSelection({
         ...selection,
-        externalSelections: next,
+        location: nextLocation,
+        internalSelections: removeAllCustomLocations(selection.internalSelections || []),
+        externalSelections: makeNext(selection.externalSelections || []),
+        inclinationSelections: removeAllCustomLocations(selection.inclinationSelections || []),
       });
     }
 

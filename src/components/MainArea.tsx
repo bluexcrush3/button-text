@@ -603,7 +603,70 @@ export const MainArea: React.FC<MainAreaProps> = ({
       return;
     }
     if (btnConfig?.category === '場所') {
-      setLocationModalBtn(btnConfig);
+      // 内部モード、または傾斜モードで内部由来の場所ボタン → 部屋番号選択ポップアップを表示
+      const isFromInternal = internalCustomButtons.some(
+        (b) => b.name === btnName && b.category === '場所' && !b.isVoice
+      );
+      if (isModeInternal || (isModeInclination && isFromInternal)) {
+        setLocationModalBtn(btnConfig);
+      } else {
+        // 外部モード、または傾斜モードで外部由来の場所ボタン → 部屋番号不要のため直接トグル
+        const baseName = btnName;
+
+        // カスタム「場所」ボタンの名前一覧（重複排除）
+        const customLocationNames = new Set(
+          [...internalCustomButtons, ...externalCustomButtons, ...inclinationCustomButtons]
+            .filter((b) => b.category === '場所' && !b.isVoice && b.name !== '音声入力')
+            .map((b) => b.name)
+        );
+
+        // 既存のカスタム場所選択を全モードから除去（ラジオ動作）
+        const removeAllCustomLocations = (selections: string[]) =>
+          selections.filter(
+            (item) =>
+              !customLocationNames.has(item) &&
+              ![...customLocationNames].some((cn) => item.startsWith(cn) && /[①-⑳]$/.test(item))
+          );
+
+        // 現在のモードで対象ボタンが選択中かチェック
+        const isCurrentlySelected = currentCustomSelections.some(
+          (item) => item === baseName || (item.startsWith(baseName) && /[①-⑳]$/.test(item))
+        );
+
+        const makeNext = (selections: string[]) => {
+          const cleaned = removeAllCustomLocations(selections);
+          if (isCurrentlySelected) {
+            // 選択中なら解除
+            return cleaned;
+          } else {
+            // 未選択なら接尾辞なしで追加
+            return [...cleaned, baseName];
+          }
+        };
+
+        // 選択する場合は固定場所もクリア
+        const nextLocation = !isCurrentlySelected
+          ? { ...selection.location, selectedLocation: null, isBuilding: false }
+          : selection.location;
+
+        if (isModeInclination) {
+          onChangeSelection({
+            ...selection,
+            location: nextLocation,
+            internalSelections: removeAllCustomLocations(selection.internalSelections || []),
+            externalSelections: removeAllCustomLocations(selection.externalSelections || []),
+            inclinationSelections: makeNext(selection.inclinationSelections || []),
+          });
+        } else {
+          onChangeSelection({
+            ...selection,
+            location: nextLocation,
+            internalSelections: removeAllCustomLocations(selection.internalSelections || []),
+            externalSelections: makeNext(selection.externalSelections || []),
+            inclinationSelections: removeAllCustomLocations(selection.inclinationSelections || []),
+          });
+        }
+      }
       return;
     }
 

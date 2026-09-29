@@ -121,21 +121,21 @@ button.btn-danger:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
+  padding: 4px 10px;
   border-bottom: 1px solid #e0e0e0;
-  gap: 8px;
+  gap: 6px;
 }
 
 .tab-list-container {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   flex: 1;
   overflow-x: auto;
   white-space: nowrap;
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 2px;
+  padding-bottom: 1px;
 }
 
 .tab-list-container::-webkit-scrollbar {
@@ -152,17 +152,17 @@ button.btn-danger:active {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 4px 10px;
-  min-height: 40px;
-  font-size: 0.88rem;
+  padding: 1px 6px;
+  min-height: 26px;
+  font-size: 0.82rem;
   white-space: nowrap;
   border: 2px solid var(--border-color);
   background-color: #ffffff;
-  border-radius: 6px;
+  border-radius: 5px;
   flex-shrink: 0;
   transition: all 0.15s ease;
   cursor: pointer;
-  line-height: 1.25;
+  line-height: 1.15;
 }
 
 .tab-project-no {
@@ -247,7 +247,7 @@ button.btn-danger:active {
 .header-actions-right {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   flex-shrink: 0;
 }
 
@@ -255,8 +255,8 @@ button.btn-danger:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 38px;
+  width: 30px;
+  height: 28px;
   padding: 0;
   border-radius: 6px;
   background-color: #ffffff;
@@ -277,8 +277,8 @@ button.btn-danger:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 38px;
+  width: 30px;
+  height: 28px;
   padding: 0;
   border-radius: 6px;
   background-color: #ffffff;
@@ -299,8 +299,8 @@ button.btn-danger:active {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 38px;
+  width: 30px;
+  height: 28px;
   padding: 0;
   border-radius: 6px;
   background-color: #fff1f2;
@@ -320,18 +320,18 @@ button.btn-danger:active {
 /* ヘッダー 2行目: テキスト表示エリア単体 */
 .header-row-text {
   display: flex;
-  padding: 8px 10px;
+  padding: 3px 10px;
   border-bottom: 1px solid #e0e0e0;
   background-color: #ffffff;
 }
 
 .generated-text-box {
   flex: 1;
-  min-height: 44px;
+  min-height: 28px;
   background-color: #ffffff;
   border: 2px solid var(--border-color);
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 3px 8px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -346,15 +346,15 @@ button.btn-danger:active {
 .header-row-navigation {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 4px 10px;
   border-bottom: 1px solid #e0e0e0;
   background-color: #fafafa;
 }
 
 .nav-btn {
-  padding: 8px 12px;
-  font-size: 0.9rem;
+  padding: 4px 10px;
+  font-size: 0.85rem;
   white-space: nowrap;
   flex-shrink: 0;
   display: inline-flex;
@@ -364,7 +364,7 @@ button.btn-danger:active {
 }
 
 .header-row-navigation .confirm-btn {
-  padding: 8px 14px;
+  padding: 4px 10px;
 }
 
 .line-indicator {
@@ -382,9 +382,9 @@ button.btn-danger:active {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 3px 10px;
   background-color: #f1f3f5;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
   gap: 6px;
   overflow-x: auto;
@@ -400,7 +400,7 @@ button.btn-danger:active {
 .status-badge {
   background-color: #ffffff;
   border: 1px solid var(--border-color);
-  padding: 3px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -409,8 +409,8 @@ button.btn-danger:active {
 }
 
 .btn-copy-prev {
-  font-size: 0.8rem;
-  padding: 4px 8px;
+  font-size: 0.78rem;
+  padding: 3px 6px;
   background-color: #ffffff;
   border: 2px solid var(--border-color);
   border-radius: 6px;

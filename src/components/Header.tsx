@@ -192,7 +192,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
             {/* 一括音声入力ボタン（傾斜モードなら傾音声、それ以外はW音声） */}
             {currentSelection && onChangeSelection && (
               currentMode === '傾斜' ? (
@@ -214,7 +214,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="btn-copy-prev"
               onClick={onInsertLine}
               title="現在の行の直後に行（ページ）を挿入"
-              style={{ backgroundColor: '#eef6ff', borderColor: '#0d6efd', padding: '4px 8px' }}
+              style={{ backgroundColor: '#eef6ff', borderColor: '#0d6efd', padding: '3px 6px' }}
             >
               <Plus size={16} />
             </button>
@@ -225,7 +225,7 @@ export const Header: React.FC<HeaderProps> = ({
               className="btn-copy-prev"
               onClick={onDeleteLine}
               title="現在の行（ページ）を削除"
-              style={{ backgroundColor: '#fff5f5', borderColor: '#dc3545', color: '#dc3545', padding: '4px 8px' }}
+              style={{ backgroundColor: '#fff5f5', borderColor: '#dc3545', color: '#dc3545', padding: '3px 6px' }}
             >
               <X size={16} />
             </button>

@@ -343,6 +343,55 @@ export const App: React.FC = () => {
     // ディープコピー
     const copiedSelection: LineSelection = JSON.parse(JSON.stringify(prevSelection));
 
+    // 「損傷」グループのボタン情報は引き継がない
+    copiedSelection.damages = [];
+    copiedSelection.internalDamages = [];
+    copiedSelection.externalDamages = [];
+    copiedSelection.inclinationValues = [];
+
+    // 「現況」ボタンのみはそのまま情報を引き継ぐ（それ以外の「全景」などは引き継がない）
+    if (copiedSelection.situationButton !== '現況') {
+      copiedSelection.situationButton = null;
+    }
+
+    // 「損傷」カテゴリーのカスタムボタン選択を除外
+    const internalDamageBtnNames = new Set(
+      internalCustomButtons.filter((b) => b.category === '損傷').map((b) => b.name)
+    );
+    const externalDamageBtnNames = new Set(
+      externalCustomButtons.filter((b) => b.category === '損傷').map((b) => b.name)
+    );
+    const inclinationDamageBtnNames = new Set(
+      inclinationCustomButtons.filter((b) => b.category === '損傷').map((b) => b.name)
+    );
+
+    const filterCustomSelections = (selections: string[] = [], damageNames: Set<string>) => {
+      return selections.filter((name) => {
+        const baseName = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+        return !damageNames.has(name) && !damageNames.has(baseName);
+      });
+    };
+
+    copiedSelection.internalSelections = filterCustomSelections(
+      copiedSelection.internalSelections,
+      internalDamageBtnNames
+    );
+    copiedSelection.externalSelections = filterCustomSelections(
+      copiedSelection.externalSelections,
+      externalDamageBtnNames
+    );
+    copiedSelection.inclinationSelections = filterCustomSelections(
+      copiedSelection.inclinationSelections,
+      inclinationDamageBtnNames
+    );
+
+    // 音声入力項目のうち「損傷」カテゴリーを除外
+    if (copiedSelection.voiceItems) {
+      copiedSelection.voiceItems = copiedSelection.voiceItems.filter(
+        (item) => item.category !== '損傷'
+      );
+    }
+
     handleChangeSelection(copiedSelection);
   };
 

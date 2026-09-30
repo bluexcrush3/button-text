@@ -117,32 +117,55 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2行目: 1つ前のページのテキスト表示（1ページ目は非表示） */}
-      {prevLine && (
-        <div className="header-row-text">
-          <div
-            className="generated-text-box"
-            style={{
-              width: '100%',
-              opacity: 0.45,
-              color: '#888',
-              backgroundColor: '#f5f5f5',
-              pointerEvents: 'none',
-              userSelect: 'none',
-              fontStyle: 'italic',
-            }}
-            title={`前のページ: ${prevLineText || '（未入力）'}`}
-          >
-            {prevLineText || <span style={{ color: '#bbb', fontWeight: 'normal' }}>（未入力）</span>}
+      {/* 2行目・3行目: テキスト表示エリア ＆ 右側「×」現在の行削除ボタン */}
+      <div className="header-row-text" style={{ display: 'flex', alignItems: 'stretch', gap: '6px' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px', minWidth: 0 }}>
+          {prevLine && (
+            <div
+              className="generated-text-box"
+              style={{
+                width: '100%',
+                opacity: 0.45,
+                color: '#888',
+                backgroundColor: '#f5f5f5',
+                pointerEvents: 'none',
+                userSelect: 'none',
+                fontStyle: 'italic',
+              }}
+              title={`前のページ: ${prevLineText || '（未入力）'}`}
+            >
+              {prevLineText || <span style={{ color: '#bbb', fontWeight: 'normal' }}>（未入力）</span>}
+            </div>
+          )}
+          <div className="generated-text-box" style={{ width: '100%' }}>
+            {currentLineText || <span style={{ color: '#aaa', fontWeight: 'normal' }}>（ボタンを選択してください）</span>}
           </div>
         </div>
-      )}
 
-      {/* 3行目: テキスト表示エリア単体（現在のページ） */}
-      <div className="header-row-text">
-        <div className="generated-text-box" style={{ width: '100%' }}>
-          {currentLineText || <span style={{ color: '#aaa', fontWeight: 'normal' }}>（ボタンを選択してください）</span>}
-        </div>
+        {/* 右側: 「×」現在の行削除ボタン */}
+        <button
+          type="button"
+          className="btn-delete-line"
+          onClick={onDeleteLine}
+          title="現在の行（ページ）を削除"
+          style={{
+            backgroundColor: '#fff5f5',
+            borderColor: '#dc3545',
+            color: '#dc3545',
+            padding: '0 8px',
+            alignSelf: 'stretch',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '6px',
+            flexShrink: 0,
+            borderWidth: '2px',
+            borderStyle: 'solid',
+            cursor: 'pointer',
+          }}
+        >
+          <X size={18} />
+        </button>
       </div>
 
       {/* 3行目: 前へ / 次へ / 確認ボタン & 現在地表示 */}
@@ -182,7 +205,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      {/* 3行目: 基本情報サマリー ＆ 「＋」「×」「前回と同じ」ボタン */}
+      {/* 3行目: 基本情報サマリー ＆ 「＋」「前回と同じ」ボタン */}
       {activeTab && (
         <div className="header-row-3">
           <div className="status-badges-group">
@@ -217,17 +240,6 @@ export const Header: React.FC<HeaderProps> = ({
               style={{ backgroundColor: '#eef6ff', borderColor: '#0d6efd', padding: '3px 6px' }}
             >
               <Plus size={16} />
-            </button>
-
-            {/* 「×」現在の行削除ボタン */}
-            <button
-              type="button"
-              className="btn-copy-prev"
-              onClick={onDeleteLine}
-              title="現在の行（ページ）を削除"
-              style={{ backgroundColor: '#fff5f5', borderColor: '#dc3545', color: '#dc3545', padding: '3px 6px' }}
-            >
-              <X size={16} />
             </button>
 
             {/* 「前回と同じ」ボタン */}

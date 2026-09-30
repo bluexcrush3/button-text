@@ -106,7 +106,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                     flexDirection: 'column',
                     gap: '6px',
                     flex: 1,
-                    overflowY: 'auto',
+                    overflowY: isWrapText ? 'visible' : 'auto',
                     minHeight: 0,
                     backgroundColor: '#f8f9fa',
                     padding: '6px',

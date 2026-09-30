@@ -597,6 +597,8 @@ button.btn-danger:active {
   border-radius: var(--border-radius);
   background-color: #fff;
   outline: none;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .modal-footer {

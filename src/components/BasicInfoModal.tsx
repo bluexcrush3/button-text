@@ -22,11 +22,18 @@ export const BasicInfoModal: React.FC<BasicInfoModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      document.body.style.overflow = 'hidden';
       setFormData({
         ...basicInfo,
         surveyDate: basicInfo.surveyDate || getTodayDateString(),
       });
+    } else {
+      document.body.style.overflow = 'unset';
     }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
   }, [isOpen, basicInfo]);
 
   if (!isOpen) return null;

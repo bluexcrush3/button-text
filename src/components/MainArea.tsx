@@ -225,7 +225,10 @@ export const MainArea: React.FC<MainAreaProps> = ({
       );
     } else {
       const newItem: DamageItem = { name: damageName, valueW: 0, valueL: 0 };
-      if (current.length >= 2) {
+      if (selection.situationButton) {
+        // 「現況」「全景」が選択されていたら解除してこの損傷1つのみ選択
+        next = [newItem];
+      } else if (current.length >= 2) {
         next = [current[1], newItem];
       } else {
         next = [...current, newItem];
@@ -245,7 +248,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
       activeDamageNames.has(d.name) || activeDamageNames.has(d.name.replace(/^[左右上下]/, ''))
     );
 
-    const nextSituationButton = next.length > 0 ? null : selection.situationButton;
+    const nextSituationButton = null;
 
     if (isModeInternal) {
       onChangeSelection({
@@ -424,15 +427,6 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
-  // ⑤ 状況グループボタン切り替え
-  const handleSituationToggle = (buttonType: '全景' | '現況') => {
-    const nextBtn = selection.situationButton === buttonType ? null : buttonType;
-    onChangeSelection({
-      ...selection,
-      situationButton: nextBtn,
-    });
-  };
-
   const currentMode = selection.mode || '外部';
   const isModeInternal = currentMode === '内部';
   const isModeInclination = currentMode === '傾斜';
@@ -479,6 +473,55 @@ export const MainArea: React.FC<MainAreaProps> = ({
     : isModeInclination
       ? (selection.inclinationValues || [])
       : (selection.externalDamages || []);
+
+  // ⑤ 状況グループボタン切り替え（「現況」「全景」のみ単独選択、他損傷は排他的に解除）
+  const handleSituationToggle = (buttonType: '全景' | '現況') => {
+    const isCurrentlySelected = selection.situationButton === buttonType;
+    const nextBtn = isCurrentlySelected ? null : buttonType;
+
+    if (nextBtn) {
+      // 「現況」「全景」を選択時：他のすべての損傷選択を解除
+      const damageCustomNames = new Set(
+        displayedCustomButtons.filter((b) => b.category === '損傷').map((b) => b.name)
+      );
+      const cleanCustomSelections = (selections: string[]) =>
+        selections.filter((name) => {
+          const customBase = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+          return !damageCustomNames.has(name) && !damageCustomNames.has(customBase);
+        });
+
+      if (isModeInternal) {
+        onChangeSelection({
+          ...selection,
+          damages: [],
+          internalSelections: cleanCustomSelections(selection.internalSelections || []),
+          internalDamages: [],
+          situationButton: nextBtn,
+        });
+      } else if (isModeInclination) {
+        onChangeSelection({
+          ...selection,
+          damages: [],
+          inclinationSelections: cleanCustomSelections(selection.inclinationSelections || []),
+          situationButton: nextBtn,
+        });
+      } else {
+        onChangeSelection({
+          ...selection,
+          damages: [],
+          externalSelections: cleanCustomSelections(selection.externalSelections || []),
+          externalDamages: [],
+          situationButton: nextBtn,
+        });
+      }
+    } else {
+      // 解除
+      onChangeSelection({
+        ...selection,
+        situationButton: null,
+      });
+    }
+  };
 
   // 傾斜数値操作用
   const currentInclinationValues = selection.inclinationValues || [];
@@ -694,7 +737,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
         );
         const newItem: DamageItem = existingCustomDamage || { name: btnName, valueW: 0, valueL: 0 };
 
-        if (currentDamages.length >= 2) {
+        if (selection.situationButton) {
+          nextDamages = [newItem];
+        } else if (currentDamages.length >= 2) {
           nextDamages = [currentDamages[1], newItem];
         } else {
           nextDamages = [...currentDamages, newItem];
@@ -730,14 +775,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
           damages: nextDamages,
           internalSelections: nextCustomSelections,
           internalDamages: updatedCustomDamages,
-          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+          situationButton: null,
         });
       } else if (isModeInclination) {
         onChangeSelection({
           ...selection,
           damages: nextDamages,
           inclinationSelections: nextCustomSelections,
-          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+          situationButton: null,
         });
       } else {
         onChangeSelection({
@@ -745,7 +790,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
           damages: nextDamages,
           externalSelections: nextCustomSelections,
           externalDamages: updatedCustomDamages,
-          situationButton: nextDamages.length > 0 ? null : selection.situationButton,
+          situationButton: null,
         });
       }
       return;

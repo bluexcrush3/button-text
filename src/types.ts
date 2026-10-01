@@ -4,7 +4,7 @@ export interface BasicInfo {
   projectNumber?: string; // 工番（未入力可）
   houseNumber: number;
   surveyType: SurveyType;
-  surveyNumber?: string; // 調査番号（①～④）
+  surveyNumber?: string; // 調査番号（テキスト自由入力、未入力可）
   surveyDate?: string;   // 調査日付 (YYYY-MM-DD)
   investigator: string;
   folderNumber: number;

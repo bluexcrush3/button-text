@@ -99,7 +99,7 @@ const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData 
       projectNumber: '',
       houseNumber: 1,
       surveyType: '外部',
-      surveyNumber: '①',
+      surveyNumber: '',
       surveyDate: getTodayDateString(),
       investigator: '畦地',
       folderNumber: 100,
@@ -275,7 +275,7 @@ export const App: React.FC = () => {
         projectNumber: '',
         houseNumber: 1,
         surveyType: '外部',
-        surveyNumber: '①',
+        surveyNumber: '',
         surveyDate: getTodayDateString(),
         investigator: '畦地',
         folderNumber: 100,
@@ -295,13 +295,7 @@ export const App: React.FC = () => {
       setTabs(newTabs);
       setActiveTabId(newTabs[newTabs.length - 1].id);
     } else {
-      setTabs([
-        {
-          ...activeTab,
-          lines: [createInitialLine(activeTab?.basicInfo.surveyType)],
-          currentLineIndex: 0,
-        },
-      ]);
+      setTabs([createInitialTab('tab-1')]);
     }
     setIsDeleteModalOpen(false);
   };

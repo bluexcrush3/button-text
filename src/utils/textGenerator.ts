@@ -463,9 +463,10 @@ export function generateLineTextForSpreadsheet(
     const line3Col2 = (val1 && val2) ? val2 : '';
 
     const hasLineNumber = Boolean(lineNumber && lineNumber > 0);
-    const line1Prefix = hasLineNumber ? [`No.${lineNumber}`, `傾斜${getInclinationAlphabet(lineNumber!)}`] : [];
-    const line2Prefix = hasLineNumber ? ['', ''] : [];
-    const line3Prefix = hasLineNumber ? ['', ''] : [];
+    const startNo = hasLineNumber ? (lineNumber! - 1) * 3 + 1 : 0;
+    const line1Prefix = hasLineNumber ? [`No.${startNo}`, `傾斜${getInclinationAlphabet(lineNumber!)}`] : [];
+    const line2Prefix = hasLineNumber ? [`No.${startNo + 1}`, ''] : [];
+    const line3Prefix = hasLineNumber ? [`No.${startNo + 2}`, ''] : [];
 
     const line1 = [...line1Prefix, col1, col2, col3, '', '', col6].join(delimiter);
     const line2 = [...line2Prefix, '', line2Col2, '', '', '', ''].join(delimiter);

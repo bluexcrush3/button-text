@@ -43,7 +43,7 @@ export interface DamageItem {
   directions?: string[]; // 傾斜モード等での方向指定 ['南', '北'] / ['東', '西']
 }
 
-export type CustomButtonCategory = '場所' | '階数' | '部位' | '損傷';
+export type CustomButtonCategory = '場所' | '階数' | '部位' | '損傷' | '未定義';
 
 export interface CustomButtonConfig {
   id: string;

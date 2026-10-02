@@ -667,6 +667,12 @@ button.btn-danger:active {
   border: 1px solid #fcc2d7;
 }
 
+.category-badge.category-undefined {
+  background-color: #f1f3f5;
+  color: #868e96;
+  border: 1px solid #ced4da;
+}
+
 /* 音声入力特殊ボタン用スタイル */
 .custom-btn-voice {
   background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%) !important;

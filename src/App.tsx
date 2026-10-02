@@ -145,10 +145,15 @@ export const App: React.FC = () => {
             list = parsed.map((name: string, i: number) => ({
               id: `btn-${Date.now()}-${i}`,
               name,
-              category: '損傷',
+              category: '未定義',
             }));
           } else {
-            list = parsed;
+            list = parsed.map((b: Partial<CustomButtonConfig>) => ({
+              id: b.id || `btn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              name: b.name || '',
+              category: b.category || '未定義',
+              isVoice: b.isVoice,
+            }));
           }
           return ensureVoiceButton(list, VOICE_INPUT_INTERNAL_CONFIG);
         }
@@ -170,10 +175,15 @@ export const App: React.FC = () => {
             list = parsed.map((name: string, i: number) => ({
               id: `ext-btn-${Date.now()}-${i}`,
               name,
-              category: '損傷',
+              category: '未定義',
             }));
           } else {
-            list = parsed;
+            list = parsed.map((b: Partial<CustomButtonConfig>) => ({
+              id: b.id || `ext-btn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+              name: b.name || '',
+              category: b.category || '未定義',
+              isVoice: b.isVoice,
+            }));
           }
           return ensureVoiceButton(list, VOICE_INPUT_EXTERNAL_CONFIG);
         }
@@ -190,7 +200,13 @@ export const App: React.FC = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return ensureVoiceButton(parsed, VOICE_INPUT_INCLINATION_CONFIG);
+          const list = parsed.map((b: Partial<CustomButtonConfig>) => ({
+            id: b.id || `inc-btn-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            name: b.name || '',
+            category: b.category || '未定義',
+            isVoice: b.isVoice,
+          }));
+          return ensureVoiceButton(list, VOICE_INPUT_INCLINATION_CONFIG);
         }
       }
     } catch (e) {

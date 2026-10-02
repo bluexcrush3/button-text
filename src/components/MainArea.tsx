@@ -365,7 +365,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (!current[index]) return;
 
     const nextLessThan = !current[index].isLessThan;
-    current[index] = { ...current[index], isLessThan: nextLessThan };
+    const nextW = nextLessThan ? 0.5 : current[index].valueW;
+
+    current[index] = {
+      ...current[index],
+      isLessThan: nextLessThan,
+      valueW: nextW,
+    };
 
     onChangeSelection({
       ...selection,
@@ -980,7 +986,11 @@ export const MainArea: React.FC<MainAreaProps> = ({
       item = { name: btnName, valueW: 0, valueL: 0 };
       list.push(item);
     }
-    item.isLessThan = !item.isLessThan;
+    const nextLessThan = !item.isLessThan;
+    item.isLessThan = nextLessThan;
+    if (nextLessThan) {
+      item.valueW = 0.5;
+    }
     updateCustomDamages(list);
   };
 
@@ -1113,8 +1123,14 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
     const updated = customButtons.map((btn) => {
       if (btn.id === id) {
-        const categories: CustomButtonCategory[] = ['損傷', '場所', '階数', '部位'];
-        const currentIdx = categories.indexOf(btn.category || '損傷');
+        const categories: CustomButtonCategory[] = isModeInclination
+          ? ['部位', '場所', '階数']
+          : ['損傷', '場所', '階数', '部位'];
+
+        if (btn.category === '未定義' || !categories.includes(btn.category)) {
+          return { ...btn, category: categories[0] };
+        }
+        const currentIdx = categories.indexOf(btn.category);
         const nextCat = categories[(currentIdx + 1) % categories.length];
         return { ...btn, category: nextCat };
       }
@@ -1275,7 +1291,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
   const handlePartDrop = (fromName: string, toName: string) => {
     const customNames = displayedCustomButtons
-      .filter((b) => (b.category || '部位') === '部位' && !b.isVoice && b.name !== '音声入力')
+      .filter((b) => b.category === '部位' && !b.isVoice && b.name !== '音声入力')
       .map((b) => b.name);
     const next = reorderItemInList(partOptions, DEFAULT_PART_OPTIONS, customNames, fromName, toName);
     setPartOptions(next);
@@ -1456,7 +1472,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
     isDisabled: boolean = false
   ) => {
     const btns = displayedCustomButtons.filter(
-      (b) => (b.category || '部位') === cat && !b.isVoice && b.name !== '音声入力'
+      (b) => b.category === cat && !b.isVoice && b.name !== '音声入力'
     );
     if (btns.length === 0) return null;
 
@@ -1551,7 +1567,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
     isDisabled: boolean = false
   ) => {
     const customBtns = displayedCustomButtons.filter(
-      (b) => (b.category || '部位') === cat && !b.isVoice && b.name !== '音声入力'
+      (b) => b.category === cat && !b.isVoice && b.name !== '音声入力'
     );
     const customMap = new Map(customBtns.map((b) => [b.name, b]));
 
@@ -1865,7 +1881,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       ? 'category-floor'
                       : item.category === '部位'
                         ? 'category-part'
-                        : 'category-damage'
+                        : item.category === '未定義'
+                          ? 'category-undefined'
+                          : 'category-damage'
                     }`}
                   style={{ fontSize: '0.62rem', padding: '0 4px' }}
                 >
@@ -2625,7 +2643,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               ? 'category-floor'
                               : btnConfig.category === '部位'
                                 ? 'category-part'
-                                : 'category-damage'
+                                : btnConfig.category === '未定義'
+                                  ? 'category-undefined'
+                                  : 'category-damage'
                             }`}
                           style={{ cursor: 'pointer', border: 'none' }}
                           title="クリックして種類切り替え"
@@ -3245,7 +3265,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               ? 'category-floor'
                               : btnConfig.category === '部位'
                                 ? 'category-part'
-                                : 'category-damage'
+                                : btnConfig.category === '未定義'
+                                  ? 'category-undefined'
+                                  : 'category-damage'
                             }`}
                           style={{ cursor: 'pointer', border: 'none' }}
                           title="クリックして種類切り替え"
@@ -4034,7 +4056,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
                               ? 'category-floor'
                               : btnConfig.category === '部位'
                                 ? 'category-part'
-                                : 'category-damage'
+                                : btnConfig.category === '未定義'
+                                  ? 'category-undefined'
+                                  : 'category-damage'
                             }`}
                           style={{ cursor: 'pointer', border: 'none' }}
                           title="クリックして種類切り替え"

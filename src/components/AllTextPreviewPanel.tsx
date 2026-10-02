@@ -30,7 +30,7 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
         try {
             const headerLine = formatBasicInfoHeader(basicInfo);
             const lineTextsForCopy = lines
-                .map((line) => generateLineTextForSpreadsheet(line.selection, customButtons, delimiter))
+                .map((line, idx) => generateLineTextForSpreadsheet(line.selection, customButtons, delimiter, idx + 1))
                 .filter((t, idx) => t.replace(/[\t;]/g, '').trim().length > 0 || lines[idx]?.selection.mode === '傾斜');
 
             const copyText = headerLine

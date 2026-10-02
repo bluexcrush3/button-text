@@ -152,7 +152,7 @@ export function getLineComponents(
       customButtons.find((b) => b.name === btnName) ||
       customButtons.find((b) => b.name === btnName.replace(/[①-⑳]/g, '')) ||
       customButtons.find((b) => b.name === baseName);
-    const cat = btnConfig?.category || '部位';
+    const cat = btnConfig?.category || '未定義';
 
     if (cat === '場所') {
       locationNames.push(btnName);
@@ -394,10 +394,25 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
 /**
  * クリップボード（スプレッドシート貼付）用フォーマット（全6列タブ区切り）
  */
+/**
+ * ページ番号に応じた傾斜用アルファベット（Ａ〜Ｚ、ａ〜ｚ）を生成
+ */
+export function getInclinationAlphabet(pageNumber: number): string {
+  if (pageNumber <= 0) return '';
+  const idx = pageNumber - 1;
+  if (idx < 26) {
+    return String.fromCharCode(0xFF21 + idx); // 全角 Ａ〜Ｚ
+  } else {
+    const smallIdx = (idx - 26) % 26;
+    return String.fromCharCode(0xFF41 + smallIdx); // 全角 ａ〜ｚ
+  }
+}
+
 export function generateLineTextForSpreadsheet(
   selection: LineSelection,
   customButtonsInput: CustomButtonsInput = [],
-  delimiter: string = '\t'
+  delimiter: string = '\t',
+  lineNumber?: number
 ): string {
   const comp = getLineComponents(selection, customButtonsInput);
 
@@ -447,9 +462,14 @@ export function generateLineTextForSpreadsheet(
     // ・それ以外: 表示なし
     const line3Col2 = (val1 && val2) ? val2 : '';
 
-    const line1 = [col1, col2, col3, '', '', col6].join(delimiter);
-    const line2 = ['', line2Col2, '', '', '', ''].join(delimiter);
-    const line3 = ['', line3Col2, '', '', '', ''].join(delimiter);
+    const hasLineNumber = Boolean(lineNumber && lineNumber > 0);
+    const line1Prefix = hasLineNumber ? [`No.${lineNumber}`, `傾斜${getInclinationAlphabet(lineNumber!)}`] : [];
+    const line2Prefix = hasLineNumber ? ['', ''] : [];
+    const line3Prefix = hasLineNumber ? ['', ''] : [];
+
+    const line1 = [...line1Prefix, col1, col2, col3, '', '', col6].join(delimiter);
+    const line2 = [...line2Prefix, '', line2Col2, '', '', '', ''].join(delimiter);
+    const line3 = [...line3Prefix, '', line3Col2, '', '', '', ''].join(delimiter);
 
     return `${line1}\n${line2}\n${line3}`;
   }
@@ -540,7 +560,8 @@ export function generateLineTextForSpreadsheet(
     col5 = '';
   }
 
-  return [col1, col2, col3, col4, col5, col6].join(delimiter);
+  const prefixCols = (lineNumber && lineNumber > 0) ? [`No.${lineNumber}`, ''] : [];
+  return [...prefixCols, col1, col2, col3, col4, col5, col6].join(delimiter);
 }
 
 export function generateLineText(

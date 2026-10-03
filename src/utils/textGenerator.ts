@@ -581,5 +581,10 @@ export function generateLineText(
     .filter((t) => t.length > 0)
     .join(delimiter);
 }
-
-
+export function hasLineInput(
+  selection: LineSelection,
+  customButtonsInput: CustomButtonsInput = []
+): boolean {
+  const text = generateLineText(selection, customButtonsInput);
+  return text.trim().length > 0;
+}

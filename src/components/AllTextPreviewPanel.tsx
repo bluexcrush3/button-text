@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineData, BasicInfo } from '../types';
-import { generateLineText, generateLineTextForSpreadsheet, formatBasicInfoHeader, CustomButtonsInput } from '../utils/textGenerator';
+import { generateLineText, generateLineTextForSpreadsheet, formatBasicInfoHeader, hasLineInput, CustomButtonsInput } from '../utils/textGenerator';
 import { FileText, Copy, Check, WrapText } from 'lucide-react';
 import { CopyFormatModal } from './CopyFormatModal';
 
@@ -29,12 +29,13 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
     const handleSelectFormatAndCopy = async (delimiter: '\t' | ';') => {
         try {
             const headerLine = formatBasicInfoHeader(basicInfo);
-            const lineTextsForCopy = lines
-                .map((line, idx) => generateLineTextForSpreadsheet(line.selection, customButtons, delimiter, idx + 1))
-                .filter((t, idx) => t.replace(/[\t;]/g, '').trim().length > 0 || lines[idx]?.selection.mode === '傾斜');
+            const validLines = lines.filter((line) => hasLineInput(line.selection, customButtons));
+            const lineTextsForCopy = validLines.map((line, validIdx) =>
+                generateLineTextForSpreadsheet(line.selection, customButtons, delimiter, validIdx + 1)
+            );
 
             const copyText = headerLine
-                ? [headerLine, ...lineTextsForCopy].join('\n')
+                ? (lineTextsForCopy.length > 0 ? [headerLine, ...lineTextsForCopy].join('\n') : headerLine)
                 : lineTextsForCopy.join('\n');
 
             await navigator.clipboard.writeText(copyText);

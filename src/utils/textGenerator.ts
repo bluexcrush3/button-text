@@ -1,4 +1,4 @@
-import { LineSelection, CustomButtonConfig, DamageItem, BasicInfo, getTodayDateString } from '../types';
+import { LineSelection, LineData, SurveyType, CustomButtonConfig, DamageItem, BasicInfo, getTodayDateString } from '../types';
 
 /**
  * 基本情報設定のヘッダー文字列を生成
@@ -176,32 +176,34 @@ export function getLineComponents(
   });
 
   // 音声入力によって登録された文字列の合流
+  const voiceDamageItems: DamageItem[] = [];
   if (selection.voiceItems && selection.voiceItems.length > 0) {
     selection.voiceItems.forEach((vItem) => {
+      const text = vItem.text?.trim();
+      if (!text) return;
       if (vItem.category === '場所') {
-        locationNames.push(vItem.text);
+        locationNames.push(text);
       } else if (vItem.category === '階数') {
-        floorNames.push(vItem.text);
+        floorNames.push(text);
       } else if (vItem.category === '部位') {
-        partNames.push(vItem.text);
+        partNames.push(text);
       } else if (vItem.category === '損傷') {
-        customDamageItemsList.push({ name: vItem.text, valueW: 0, valueL: 0 });
-        customDamageStrings.push(vItem.text);
+        voiceDamageItems.push({ name: text, valueW: 0, valueL: 0 });
       }
     });
   }
 
+  const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
+  const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
+
+  const { floor1, floor2 } = selection.location || {};
+  const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
+  const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
+  const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
+
+  const part = [selection.part, ...partNames].filter(Boolean).join('');
+
   if (isInclination) {
-    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
-    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
-
-    const { floor1, floor2 } = selection.location || {};
-    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
-    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
-    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
-
-    const part = [selection.part, ...partNames].filter(Boolean).join('');
-
     // 傾斜モードの数値リスト（inclinationValues）
     const inclinationValuesList = (selection.inclinationValues && selection.inclinationValues.length > 0)
       ? selection.inclinationValues
@@ -226,63 +228,32 @@ export function getLineComponents(
     };
   }
 
-  if (isInternal) {
-    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
-    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
+  // 損傷アイテムリストの構築:
+  // 1. selection.damages（標準損傷ボタン・カスタム損傷ボタンから選択された項目）
+  // 2. または selectedBtnNames 由来の customDamageItemsList
+  // 3. 音声入力による「損傷」項目（重複しないよう合流）
+  const baseDamageItems: DamageItem[] = (selection.damages && selection.damages.length > 0)
+    ? [...selection.damages]
+    : [...customDamageItemsList];
 
-    const { floor1, floor2 } = selection.location || {};
-    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
-    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
-    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
-
-    const damageItemsList: DamageItem[] = (selection.damages && selection.damages.length > 0)
-      ? selection.damages
-      : customDamageItemsList;
-
-    const damageStringsList: string[] = (selection.damages && selection.damages.length > 0)
-      ? selection.damages.map((d) => buildDamageItemString(d))
-      : customDamageStrings;
-
-    return {
-      location,
-      floor,
-      direction,
-      part: [selection.part, ...partNames].filter(Boolean).join(''),
-      damages: damageStringsList,
-      damageItems: damageItemsList,
-      situation,
-    };
-  } else {
-    // 外部モード
-    const baseLocationStr = selection.location?.selectedLocation ?? (selection.location?.isBuilding ? '建物' : '');
-    const location = [baseLocationStr, ...locationNames].filter(Boolean).join('');
-
-    const { floor1, floor2 } = selection.location || {};
-    const isFloorDisabled = baseLocationStr === '塀' || baseLocationStr === '土間';
-    const stepperFloor = isFloorDisabled ? '' : formatFloor(floor1, floor2);
-    const floor = floorNames.length > 0 ? floorNames.join('') : stepperFloor;
-
-    const part = [selection.part, ...partNames].filter(Boolean).join('');
-
-    const allDamageStrings: string[] = [];
-    const allDamageItems: DamageItem[] = selection.damages || [];
-
-    if (allDamageItems.length > 0) {
-      allDamageItems.forEach((d) => {
-        allDamageStrings.push(buildDamageItemString(d));
-      });
+  const allDamageItems: DamageItem[] = [...baseDamageItems];
+  voiceDamageItems.forEach((vItem) => {
+    if (!allDamageItems.some((d) => d.name === vItem.name)) {
+      allDamageItems.push(vItem);
     }
+  });
 
-    return {
-      location,
-      floor,
-      direction,
-      part,
-      damages: allDamageStrings,
-      damageItems: allDamageItems,
-      situation,
-    };
-  }
+  const allDamageStrings = allDamageItems.map((d) => buildDamageItemString(d));
+
+  return {
+    location,
+    floor,
+    direction,
+    part,
+    damages: allDamageStrings,
+    damageItems: allDamageItems,
+    situation,
+  };
 }
 
 /**
@@ -395,24 +366,54 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
  * クリップボード（スプレッドシート貼付）用フォーマット（全6列タブ区切り）
  */
 /**
+ * 0ベースのインデックスから全角アルファベットを取得 (0 = Ａ, 1 = Ｂ, ..., 25 = Ｚ, 26 = ａ, ...)
+ */
+export function getAlphabetFromIndex(index: number): string {
+  if (index < 0) return '';
+  if (index < 26) {
+    return String.fromCharCode(0xFF21 + index); // 全角 Ａ〜Ｚ
+  } else {
+    const smallIdx = (index - 26) % 26;
+    return String.fromCharCode(0xFF41 + smallIdx); // 全角 ａ〜ｚ
+  }
+}
+
+/**
+ * 文字列（半角または全角）から全角アルファベットに変換
+ */
+export function toFullWidthAlphabet(char: string): string {
+  if (!char) return '';
+  const trimmed = char.trim();
+  if (!trimmed) return '';
+  const code = trimmed.charCodeAt(0);
+  // 半角 A-Z (0x41 - 0x5A) -> 全角 Ａ-Ｚ (0xFF21 - 0xFF3A)
+  if (code >= 0x41 && code <= 0x5a) {
+    return String.fromCharCode(code - 0x41 + 0xff21);
+  }
+  // 半角 a-z (0x61 - 0x7a) -> 全角 ａ-ｚ (0xff41 - 0xff5a)
+  if (code >= 0x61 && code <= 0x7a) {
+    return String.fromCharCode(code - 0x61 + 0xff41);
+  }
+  return trimmed.charAt(0);
+}
+
+/**
  * ページ番号に応じた傾斜用アルファベット（Ａ〜Ｚ、ａ〜ｚ）を生成
  */
 export function getInclinationAlphabet(pageNumber: number): string {
   if (pageNumber <= 0) return '';
-  const idx = pageNumber - 1;
-  if (idx < 26) {
-    return String.fromCharCode(0xFF21 + idx); // 全角 Ａ〜Ｚ
-  } else {
-    const smallIdx = (idx - 26) % 26;
-    return String.fromCharCode(0xFF41 + smallIdx); // 全角 ａ〜ｚ
-  }
+  return getAlphabetFromIndex(pageNumber - 1);
 }
 
 export function generateLineTextForSpreadsheet(
   selection: LineSelection,
   customButtonsInput: CustomButtonsInput = [],
   delimiter: string = '\t',
-  lineNumber?: number
+  lineNumber?: number,
+  options?: {
+    startRowNo?: number;
+    inclinationLetter?: string;
+  }
 ): string {
   const comp = getLineComponents(selection, customButtonsInput);
 
@@ -462,11 +463,20 @@ export function generateLineTextForSpreadsheet(
     // ・それ以外: 表示なし
     const line3Col2 = (val1 && val2) ? val2 : '';
 
-    const hasLineNumber = Boolean(lineNumber && lineNumber > 0);
-    const startNo = hasLineNumber ? (lineNumber! - 1) * 3 + 1 : 0;
-    const line1Prefix = hasLineNumber ? [`No.${startNo}`, `傾斜${getInclinationAlphabet(lineNumber!)}`] : [];
-    const line2Prefix = hasLineNumber ? [`No.${startNo + 1}`, ''] : [];
-    const line3Prefix = hasLineNumber ? [`No.${startNo + 2}`, ''] : [];
+    const hasStartRowNo = options?.startRowNo !== undefined;
+    const hasLineNumber = hasStartRowNo || Boolean(lineNumber && lineNumber > 0);
+
+    const startNo = hasStartRowNo
+      ? options!.startRowNo!
+      : (hasLineNumber ? (lineNumber! - 1) * 3 + 1 : 0);
+
+    const incLetter = options?.inclinationLetter
+      ? toFullWidthAlphabet(options.inclinationLetter)
+      : (hasLineNumber ? getInclinationAlphabet(lineNumber!) : '');
+
+    const line1Prefix = hasLineNumber ? [`${startNo}`, `傾斜${incLetter}`] : [];
+    const line2Prefix = hasLineNumber ? [`${startNo + 1}`, ''] : [];
+    const line3Prefix = hasLineNumber ? [`${startNo + 2}`, ''] : [];
 
     const line1 = [...line1Prefix, col1, col2, col3, '', '', col6].join(delimiter);
     const line2 = [...line2Prefix, '', line2Col2, '', '', '', ''].join(delimiter);
@@ -512,17 +522,18 @@ export function generateLineTextForSpreadsheet(
     const valDetail1 = formatDamageValueDetail(item1);
     const valDetail2 = formatDamageValueDetail(item2);
 
-    const isSameName = parsed1.baseName === parsed2.baseName;
+    const baseNames = Array.from(new Set(items.map((it) => parseDamageName(it.name).baseName).filter(Boolean)));
+    const isSameName = baseNames.length === 1;
 
     if (isSameName) {
-      // 同名２つ（③, ⑥）
+      // 同名２つ以上（③, ⑥）
       const prefix1 = parsed1.prefix || '左';
       const prefix2 = parsed2.prefix || '右';
 
       col4 = valDetail1 ? `${prefix1}${valDetail1}` : '';
       col5 = valDetail2 ? `${prefix2}${valDetail2}` : '';
 
-      const damagePartText = sitBtn ? `${parsed1.baseName}・${sitBtn}` : parsed1.baseName;
+      const damagePartText = sitBtn ? `${baseNames[0]}・${sitBtn}` : baseNames[0];
 
       if (hasLocation) {
         // ③ "場所"あり / 同名2つ
@@ -534,14 +545,15 @@ export function generateLineTextForSpreadsheet(
         col3 = damagePartText;
       }
     } else {
-      // 異なる２つ（②, ⑤）
+      // 異なる２つ以上（②, ⑤）
       const damage1Text = parsed1.baseName;
       const damage2Text = parsed2.baseName;
 
       col4 = valDetail1 ? `${damage1Text}　${valDetail1}` : '';
       col5 = valDetail2 ? `${damage2Text}　${valDetail2}` : '';
 
-      const damagePartText = sitBtn ? `${damage1Text}・${damage2Text}・${sitBtn}` : `${damage1Text}・${damage2Text}`;
+      const allDamageNameStr = baseNames.join('・');
+      const damagePartText = sitBtn ? `${allDamageNameStr}・${sitBtn}` : allDamageNameStr;
 
       if (hasLocation) {
         // ② "場所"あり / 異なる2つ
@@ -561,7 +573,9 @@ export function generateLineTextForSpreadsheet(
     col5 = '';
   }
 
-  const prefixCols = (lineNumber && lineNumber > 0) ? [`No.${lineNumber}`, ''] : [];
+  const hasStartRowNo = options?.startRowNo !== undefined;
+  const targetNo = hasStartRowNo ? options!.startRowNo! : lineNumber;
+  const prefixCols = (targetNo && targetNo > 0) ? [`${targetNo}`, ''] : [];
   return [...prefixCols, col1, col2, col3, col4, col5, col6].join(delimiter);
 }
 
@@ -587,4 +601,52 @@ export function hasLineInput(
 ): boolean {
   const text = generateLineText(selection, customButtonsInput);
   return text.trim().length > 0;
+}
+
+export interface CopyNumberOptions {
+  startNo: number;
+  startInclination: string;
+}
+
+/**
+ * 有効な行データ一覧から、開始No.および開始傾斜点に基づいてスプレッドシート用テキスト配列を生成
+ */
+export function generateAllLinesTextForSpreadsheet(
+  validLines: LineData[],
+  customButtonsInput: CustomButtonsInput = [],
+  delimiter: string = '\t',
+  copyOptions: CopyNumberOptions = { startNo: 1, startInclination: 'A' },
+  defaultSurveyType?: SurveyType
+): string[] {
+  let currentRowNo = Math.max(1, copyOptions.startNo || 1);
+
+  // 開始アルファベットのインデックス（A=0, B=1, ...）を計算
+  const startLetter = copyOptions.startInclination ? copyOptions.startInclination.trim().toUpperCase() : 'A';
+  const charCode = startLetter.charCodeAt(0);
+  const startAlphabetIdx = (charCode >= 65 && charCode <= 90) ? charCode - 65 : 0;
+  let currentInclinationIdx = startAlphabetIdx;
+
+  return validLines.map((line) => {
+    const isInc = line.selection.mode === '傾斜' || (!line.selection.mode && defaultSurveyType === '傾斜');
+    const thisRowNo = currentRowNo;
+    const thisLetter = isInc ? getAlphabetFromIndex(currentInclinationIdx) : '';
+
+    if (isInc) {
+      currentRowNo += 3;
+      currentInclinationIdx += 1;
+    } else {
+      currentRowNo += 1;
+    }
+
+    return generateLineTextForSpreadsheet(
+      line.selection,
+      customButtonsInput,
+      delimiter,
+      undefined,
+      {
+        startRowNo: thisRowNo,
+        inclinationLetter: thisLetter,
+      }
+    );
+  });
 }

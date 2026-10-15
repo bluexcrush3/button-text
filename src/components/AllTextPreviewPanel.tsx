@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineData, BasicInfo } from '../types';
-import { generateLineText, generateLineTextForSpreadsheet, formatBasicInfoHeader, hasLineInput, CustomButtonsInput } from '../utils/textGenerator';
+import { generateLineText, generateAllLinesTextForSpreadsheet, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
 import { FileText, Copy, Check, WrapText } from 'lucide-react';
 import { CopyFormatModal } from './CopyFormatModal';
 
@@ -22,16 +22,28 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
     const [copied, setCopied] = useState(false);
     const [isWrapText, setIsWrapText] = useState(false);
     const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+    const [copyStartNo, setCopyStartNo] = useState<number>(1);
+    const [copyStartInclination, setCopyStartInclination] = useState<string>('A');
 
     const lineTexts = lines.map((line) => generateLineText(line.selection, customButtons));
     const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
 
-    const handleSelectFormatAndCopy = async (delimiter: '\t' | ';') => {
+    const handleSelectFormatAndCopy = async (
+        delimiter: '\t' | ';',
+        copyOptions: CopyNumberOptions
+    ) => {
         try {
+            setCopyStartNo(copyOptions.startNo);
+            setCopyStartInclination(copyOptions.startInclination);
+
             const headerLine = formatBasicInfoHeader(basicInfo);
             const validLines = lines.filter((line) => hasLineInput(line.selection, customButtons));
-            const lineTextsForCopy = validLines.map((line, validIdx) =>
-                generateLineTextForSpreadsheet(line.selection, customButtons, delimiter, validIdx + 1)
+            const lineTextsForCopy = generateAllLinesTextForSpreadsheet(
+                validLines,
+                customButtons,
+                delimiter,
+                copyOptions,
+                basicInfo?.surveyType
             );
 
             const copyText = headerLine
@@ -182,6 +194,8 @@ export const AllTextPreviewPanel: React.FC<AllTextPreviewPanelProps> = ({
                 isOpen={isCopyModalOpen}
                 onClose={() => setIsCopyModalOpen(false)}
                 onSelectFormat={handleSelectFormatAndCopy}
+                initialStartNo={copyStartNo}
+                initialStartInclination={copyStartInclination}
             />
         </section>
     );

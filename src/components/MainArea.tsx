@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
-import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers } from 'lucide-react';
+import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers, ChevronDown, ChevronUp } from 'lucide-react';
 import { VoiceInputModal } from './VoiceInputModal';
 
 interface MainAreaProps {
@@ -621,6 +621,85 @@ export const MainArea: React.FC<MainAreaProps> = ({
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [locationModalBtn, setLocationModalBtn] = useState<CustomButtonConfig | null>(null);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 外部用カスタムボタン管理エリアのアコーディオン開閉状態（使わない時は折りたたんで表示を小さく）
+  const [isExternalCustomOpen, setIsExternalCustomOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('btn_text_gen_ext_custom_accordion');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleExternalCustomOpen = () => {
+    setIsExternalCustomOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('btn_text_gen_ext_custom_accordion', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // 内部用カスタムボタン管理エリアのアコーディオン開閉状態（使わない時は折りたたんで表示を小さく）
+  const [isInternalCustomOpen, setIsInternalCustomOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('btn_text_gen_int_custom_accordion');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleInternalCustomOpen = () => {
+    setIsInternalCustomOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('btn_text_gen_int_custom_accordion', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // 傾斜用カスタムボタン管理エリアのアコーディオン開閉状態（使わない時は折りたたんで表示を小さく）
+  const [isInclinationCustomOpen, setIsInclinationCustomOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('btn_text_gen_inc_custom_accordion');
+      return saved !== null ? JSON.parse(saved) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleInclinationCustomOpen = () => {
+    setIsInclinationCustomOpen((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('btn_text_gen_inc_custom_accordion', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  // 状況グループのプリセットボタンハンドラー（現場、家屋、その他）
+  const handleSituationPreset = (presetText: string) => {
+    const isCurrentlyActive =
+      presetText === '家屋№.より撮影'
+        ? (selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.'))
+        : selection.situationText === presetText;
+
+    onChangeSelection({
+      ...selection,
+      situationText: isCurrentlyActive ? '' : presetText,
+    });
+  };
 
   // 音声入力による文字列登録ハンドラー
   const handleRegisterVoiceText = (voiceText: string, category: CustomButtonCategory) => {
@@ -2422,47 +2501,73 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="text"
-                className="stepper-input"
-                placeholder="テキスト入力"
-                value={selection.situationText || ''}
-                onChange={(e) =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
-                  height: '42px',
-                  fontSize: '0.95rem',
-                  textAlign: 'left',
-                  padding: '0 10px',
-                  minWidth: 0,
-                }}
-              />
+            {/* ボタンエリア（上） */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '6px',
+              }}
+            >
               <button
                 type="button"
                 className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
-                onClick={() =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: '現場より撮影',
-                  })
-                }
+                onClick={() => handleSituationPreset('現場より撮影')}
                 style={{
-                  height: '42px',
-                  padding: '0 16px',
+                  height: '38px',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
-                  flexShrink: 0,
                 }}
               >
                 現場
               </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                家屋
+              </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === 'より撮影' ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                その他
+              </button>
             </div>
+
+            {/* 入力ボックス（下） */}
+            <input
+              type="text"
+              className="stepper-input"
+              placeholder="テキスト入力"
+              value={selection.situationText || ''}
+              onChange={(e) =>
+                onChangeSelection({
+                  ...selection,
+                  situationText: e.target.value,
+                })
+              }
+              style={{
+                width: '100%',
+                height: '42px',
+                fontSize: '0.95rem',
+                textAlign: 'left',
+                padding: '0 10px',
+                boxSizing: 'border-box',
+              }}
+            />
           </section>
 
           {/* ④ ボタン管理・種類設定と並び替え */}
@@ -2470,13 +2575,57 @@ export const MainArea: React.FC<MainAreaProps> = ({
             style={{
               border: '2px solid var(--border-color)',
               borderRadius: '8px',
-              padding: '10px 12px',
+              padding: isInternalCustomOpen ? '10px 12px' : '8px 12px',
               backgroundColor: '#fafafa',
+              transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '8px' }}>
-              カスタムボタン管理・種類設定
+            <div
+              onClick={toggleInternalCustomOpen}
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                marginBottom: isInternalCustomOpen ? '10px' : '0',
+              }}
+              title={isInternalCustomOpen ? 'クリックして折りたたむ' : 'クリックして展開する'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>内部用カスタムボタン管理・種類設定</span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    color: '#64748b',
+                    backgroundColor: '#e2e8f0',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  {customButtons.length}件
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: '#4f46e5',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                }}
+              >
+                <span>{isInternalCustomOpen ? '閉じる' : '開く'}</span>
+                {isInternalCustomOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
             </div>
+
+            {isInternalCustomOpen && (
+              <>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -2689,6 +2838,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   );
                 })}
               </div>
+            )}
+              </>
             )}
           </section>
         </>
@@ -3045,47 +3196,73 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="text"
-                className="stepper-input"
-                placeholder="テキスト入力"
-                value={selection.situationText || ''}
-                onChange={(e) =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
-                  height: '42px',
-                  fontSize: '0.95rem',
-                  textAlign: 'left',
-                  padding: '0 10px',
-                  minWidth: 0,
-                }}
-              />
+            {/* ボタンエリア（上） */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '6px',
+              }}
+            >
               <button
                 type="button"
                 className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
-                onClick={() =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: '現場より撮影',
-                  })
-                }
+                onClick={() => handleSituationPreset('現場より撮影')}
                 style={{
-                  height: '42px',
-                  padding: '0 16px',
+                  height: '38px',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
-                  flexShrink: 0,
                 }}
               >
                 現場
               </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                家屋
+              </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === 'より撮影' ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                その他
+              </button>
             </div>
+
+            {/* 入力ボックス（下） */}
+            <input
+              type="text"
+              className="stepper-input"
+              placeholder="テキスト入力"
+              value={selection.situationText || ''}
+              onChange={(e) =>
+                onChangeSelection({
+                  ...selection,
+                  situationText: e.target.value,
+                })
+              }
+              style={{
+                width: '100%',
+                height: '42px',
+                fontSize: '0.95rem',
+                textAlign: 'left',
+                padding: '0 10px',
+                boxSizing: 'border-box',
+              }}
+            />
           </section>
 
           {/* ⑥ 傾斜用カスタムボタン管理エリア */}
@@ -3093,14 +3270,58 @@ export const MainArea: React.FC<MainAreaProps> = ({
             style={{
               border: '2px solid var(--border-color)',
               borderRadius: '8px',
-              padding: '12px',
+              padding: isInclinationCustomOpen ? '10px 12px' : '8px 12px',
               backgroundColor: '#fafafa',
               marginTop: '8px',
+              transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '10px' }}>
-              傾斜用カスタムボタンの追加・編集
+            <div
+              onClick={toggleInclinationCustomOpen}
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                marginBottom: isInclinationCustomOpen ? '10px' : '0',
+              }}
+              title={isInclinationCustomOpen ? 'クリックして折りたたむ' : 'クリックして展開する'}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>傾斜用カスタムボタン管理・種類設定</span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    color: '#64748b',
+                    backgroundColor: '#e2e8f0',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  {customButtons.length}件
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: '#4f46e5',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
+                }}
+              >
+                <span>{isInclinationCustomOpen ? '閉じる' : '開く'}</span>
+                {isInclinationCustomOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
             </div>
+
+            {isInclinationCustomOpen && (
+              <>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
               <div style={{ display: 'flex', gap: '6px' }}>
@@ -3311,6 +3532,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
                   );
                 })}
               </div>
+            )}
+              </>
             )}
           </section>
         </>
@@ -3834,48 +4057,73 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {/* テキスト入力ボックス */}
-              <input
-                type="text"
-                className="stepper-input"
-                placeholder="テキスト入力"
-                value={selection.situationText || ''}
-                onChange={(e) =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: e.target.value,
-                  })
-                }
-                style={{
-                  flex: 1,
-                  height: '42px',
-                  fontSize: '0.95rem',
-                  textAlign: 'left',
-                  padding: '0 10px',
-                  minWidth: 0,
-                }}
-              />
+            {/* ボタンエリア（上） */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '6px',
+              }}
+            >
               <button
                 type="button"
                 className={`btn ${selection.situationText === '現場より撮影' ? 'selected' : ''}`}
-                onClick={() =>
-                  onChangeSelection({
-                    ...selection,
-                    situationText: '現場より撮影',
-                  })
-                }
+                onClick={() => handleSituationPreset('現場より撮影')}
                 style={{
-                  height: '42px',
-                  padding: '0 16px',
+                  height: '38px',
                   fontSize: '0.95rem',
                   fontWeight: 'bold',
-                  flexShrink: 0,
                 }}
               >
                 現場
               </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                家屋
+              </button>
+              <button
+                type="button"
+                className={`btn ${selection.situationText === 'より撮影' ? 'selected' : ''}`}
+                onClick={() => handleSituationPreset('より撮影')}
+                style={{
+                  height: '38px',
+                  fontSize: '0.95rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                その他
+              </button>
             </div>
+
+            {/* テキスト入力ボックス（下） */}
+            <input
+              type="text"
+              className="stepper-input"
+              placeholder="テキスト入力"
+              value={selection.situationText || ''}
+              onChange={(e) =>
+                onChangeSelection({
+                  ...selection,
+                  situationText: e.target.value,
+                })
+              }
+              style={{
+                width: '100%',
+                height: '42px',
+                fontSize: '0.95rem',
+                textAlign: 'left',
+                padding: '0 10px',
+                boxSizing: 'border-box',
+              }}
+            />
           </section>
 
           {/* 外部用カスタムボタン管理・種類設定 */}
@@ -3883,225 +4131,270 @@ export const MainArea: React.FC<MainAreaProps> = ({
             style={{
               border: '2px solid var(--border-color)',
               borderRadius: '8px',
-              padding: '10px 12px',
+              padding: isExternalCustomOpen ? '10px 12px' : '8px 12px',
               backgroundColor: '#fafafa',
+              transition: 'all 0.2s ease',
             }}
           >
-            <div style={{ fontWeight: 'bold', fontSize: '0.95rem', marginBottom: '8px' }}>
-              外部用カスタムボタン管理・種類設定
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <input
-                  type="text"
-                  placeholder="登録する文字列（例：犬走, ひび割れ）"
-                  value={newButtonName}
-                  onChange={(e) => setNewButtonName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddCustomButton();
-                    }
-                  }}
-                  style={{
-                    flex: 1,
-                    height: '36px',
-                    borderRadius: '6px',
-                    border: '2px solid var(--border-color)',
-                    padding: '0 8px',
-                    fontSize: '0.85rem',
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={handleAddCustomButton}
-                  style={{ height: '36px', fontSize: '0.85rem', padding: '0 12px' }}
-                >
-                  追加
-                </button>
-              </div>
-
+            <div
+              onClick={toggleExternalCustomOpen}
+              style={{
+                fontWeight: 'bold',
+                fontSize: '0.95rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                marginBottom: isExternalCustomOpen ? '10px' : '0',
+              }}
+              title={isExternalCustomOpen ? 'クリックして折りたたむ' : 'クリックして展開する'}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>登録種別:</span>
-                {(['損傷', '場所', '階数', '部位'] as CustomButtonCategory[]).map((cat) => (
-                  <label key={cat} style={{ fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                    <input
-                      type="radio"
-                      name="newBtnCatExt"
-                      checked={newButtonCategory === cat}
-                      onChange={() => setNewButtonCategory(cat)}
-                    />
-                    {cat}
-                  </label>
-                ))}
+                <span>外部用カスタムボタン管理・種類設定</span>
+                <span
+                  style={{
+                    fontSize: '0.72rem',
+                    color: '#64748b',
+                    backgroundColor: '#e2e8f0',
+                    padding: '2px 8px',
+                    borderRadius: '10px',
+                    fontWeight: 'normal',
+                  }}
+                >
+                  {customButtons.length}件
+                </span>
               </div>
-            </div>
-
-            {customButtons.length > 0 && (
               <div
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  gap: '6px',
-                  maxHeight: '220px',
-                  overflowY: 'auto',
-                  border: '2px solid var(--border-color)',
-                  borderRadius: '6px',
-                  padding: '6px',
-                  backgroundColor: '#ffffff',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: '#4f46e5',
+                  fontSize: '0.8rem',
+                  fontWeight: '600',
                 }}
               >
-                {customButtons.map((btnConfig, idx) => {
-                  const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
+                <span>{isExternalCustomOpen ? '閉じる' : '開く'}</span>
+                {isExternalCustomOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </div>
+            </div>
 
-                  if (isVoice) {
-                    return (
-                      <div
-                        key={btnConfig.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '6px 8px',
-                          backgroundColor: '#f5f3ff',
-                          borderRadius: '4px',
-                          border: '1.5px solid #818cf8',
-                          cursor: 'grab',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <GripVertical size={16} color="#6366f1" />
-                          <Mic size={15} color="#4f46e5" />
-                          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#312e81' }}>{btnConfig.name}</span>
-                          <span
-                            className="category-badge"
+            {isExternalCustomOpen && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input
+                      type="text"
+                      placeholder="登録する文字列（例：犬走, ひび割れ）"
+                      value={newButtonName}
+                      onChange={(e) => setNewButtonName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomButton();
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        height: '36px',
+                        borderRadius: '6px',
+                        border: '2px solid var(--border-color)',
+                        padding: '0 8px',
+                        fontSize: '0.85rem',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={handleAddCustomButton}
+                      style={{ height: '36px', fontSize: '0.85rem', padding: '0 12px' }}
+                    >
+                      追加
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>登録種別:</span>
+                    {(['損傷', '場所', '階数', '部位'] as CustomButtonCategory[]).map((cat) => (
+                      <label key={cat} style={{ fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <input
+                          type="radio"
+                          name="newBtnCatExt"
+                          checked={newButtonCategory === cat}
+                          onChange={() => setNewButtonCategory(cat)}
+                        />
+                        {cat}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {customButtons.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      border: '2px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '6px',
+                      backgroundColor: '#ffffff',
+                    }}
+                  >
+                    {customButtons.map((btnConfig, idx) => {
+                      const isVoice = btnConfig.isVoice || btnConfig.name === '音声入力';
+
+                      if (isVoice) {
+                        return (
+                          <div
+                            key={btnConfig.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, idx)}
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleDrop(e, idx)}
+                            className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
                             style={{
-                              backgroundColor: '#4f46e5',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '0.65rem',
-                              padding: '1px 5px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '6px 8px',
+                              backgroundColor: '#f5f3ff',
                               borderRadius: '4px',
-                              fontWeight: 'bold',
+                              border: '1.5px solid #818cf8',
+                              cursor: 'grab',
                             }}
                           >
-                            音声 (固定)
-                          </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <GripVertical size={16} color="#6366f1" />
+                              <Mic size={15} color="#4f46e5" />
+                              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#312e81' }}>{btnConfig.name}</span>
+                              <span
+                                className="category-badge"
+                                style={{
+                                  backgroundColor: '#4f46e5',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontSize: '0.65rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
+                                音声 (固定)
+                              </span>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => handleMoveCustomButton(idx, -1)}
+                                disabled={idx === 0}
+                                style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                                title="上に移動"
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                className="btn"
+                                onClick={() => handleMoveCustomButton(idx, 1)}
+                                disabled={idx === customButtons.length - 1}
+                                style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                                title="下に移動"
+                              >
+                                ▼
+                              </button>
+                              <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', padding: '0 4px' }}>
+                                削除不可
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={btnConfig.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, idx)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, idx)}
+                          className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '6px 8px',
+                            backgroundColor: '#f8f9fa',
+                            borderRadius: '4px',
+                            border: '1px solid #ddd',
+                            cursor: 'grab',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <GripVertical size={16} color="#888" />
+                            <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleCategory(btnConfig.id)}
+                              className={`category-badge ${btnConfig.category === '場所'
+                                ? 'category-location'
+                                : btnConfig.category === '階数'
+                                  ? 'category-floor'
+                                  : btnConfig.category === '部位'
+                                    ? 'category-part'
+                                    : btnConfig.category === '未定義'
+                                      ? 'category-undefined'
+                                      : 'category-damage'
+                                }`}
+                              style={{ cursor: 'pointer', border: 'none' }}
+                              title="クリックして種類切り替え"
+                            >
+                              {btnConfig.category} (切替)
+                            </button>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => handleMoveCustomButton(idx, -1)}
+                              disabled={idx === 0}
+                              style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                              title="上に移動"
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              className="btn"
+                              onClick={() => handleMoveCustomButton(idx, 1)}
+                              disabled={idx === customButtons.length - 1}
+                              style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
+                              title="下に移動"
+                            >
+                              ▼
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-danger"
+                              onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
+                              style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
+                              title="削除"
+                            >
+                              削除
+                            </button>
+                          </div>
                         </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <button
-                            type="button"
-                            className="btn"
-                            onClick={() => handleMoveCustomButton(idx, -1)}
-                            disabled={idx === 0}
-                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                            title="上に移動"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            className="btn"
-                            onClick={() => handleMoveCustomButton(idx, 1)}
-                            disabled={idx === customButtons.length - 1}
-                            style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                            title="下に移動"
-                          >
-                            ▼
-                          </button>
-                          <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600', padding: '0 4px' }}>
-                            削除不可
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={btnConfig.id}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, idx)}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, idx)}
-                      className={`custom-btn-item ${draggedIdx === idx ? 'dragging' : ''}`}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        backgroundColor: '#f8f9fa',
-                        borderRadius: '4px',
-                        border: '1px solid #ddd',
-                        cursor: 'grab',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <GripVertical size={16} color="#888" />
-                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>{btnConfig.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleCategory(btnConfig.id)}
-                          className={`category-badge ${btnConfig.category === '場所'
-                            ? 'category-location'
-                            : btnConfig.category === '階数'
-                              ? 'category-floor'
-                              : btnConfig.category === '部位'
-                                ? 'category-part'
-                                : btnConfig.category === '未定義'
-                                  ? 'category-undefined'
-                                  : 'category-damage'
-                            }`}
-                          style={{ cursor: 'pointer', border: 'none' }}
-                          title="クリックして種類切り替え"
-                        >
-                          {btnConfig.category} (切替)
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => handleMoveCustomButton(idx, -1)}
-                          disabled={idx === 0}
-                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                          title="上に移動"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => handleMoveCustomButton(idx, 1)}
-                          disabled={idx === customButtons.length - 1}
-                          style={{ padding: '0', fontSize: '0.75rem', height: '24px', width: '24px' }}
-                          title="下に移動"
-                        >
-                          ▼
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => handleRemoveCustomButton(btnConfig.id, btnConfig.name)}
-                          style={{ padding: '0 6px', fontSize: '0.7rem', height: '24px' }}
-                          title="削除"
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             )}
           </section>
         </>

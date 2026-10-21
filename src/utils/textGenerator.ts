@@ -527,8 +527,8 @@ export function generateLineTextForSpreadsheet(
 
     if (isSameName) {
       // 同名２つ以上（③, ⑥）
-      const prefix1 = parsed1.prefix || '左';
-      const prefix2 = parsed2.prefix || '右';
+      const prefix1 = parsed1.prefix || '右';
+      const prefix2 = parsed2.prefix || '左';
 
       col4 = valDetail1 ? `${prefix1}${valDetail1}` : '';
       col5 = valDetail2 ? `${prefix2}${valDetail2}` : '';

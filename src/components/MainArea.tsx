@@ -284,8 +284,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
     const item1 = current[0];
     const baseName = item1.name.replace(/^[左右上下]/, '');
 
-    const prefix1 = directionType === '左右' ? '左' : '上';
-    const prefix2 = directionType === '左右' ? '右' : '下';
+    const prefix1 = directionType === '左右' ? '右' : '上';
+    const prefix2 = directionType === '左右' ? '左' : '下';
 
     const damage1: DamageItem = { ...item1, name: `${prefix1}${baseName}` };
     const damage2: DamageItem = { name: `${prefix2}${baseName}`, valueW: 0, valueL: 0 };
@@ -1126,8 +1126,8 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (selectedDamageButtons.length !== 1) return;
 
     const baseName = btnName.replace(/^[左右上下]/, '');
-    const prefix1 = directionType === '左右' ? '左' : '上';
-    const prefix2 = directionType === '左右' ? '右' : '下';
+    const prefix1 = directionType === '左右' ? '右' : '上';
+    const prefix2 = directionType === '左右' ? '左' : '下';
 
     const name1 = `${prefix1}${baseName}`;
     const name2 = `${prefix2}${baseName}`;

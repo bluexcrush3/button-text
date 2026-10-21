@@ -77,6 +77,7 @@ const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelecti
   damages: [],
   situationButton: null, // デフォルト未選択
   situationText: '',
+  memo: '',
   internalSelections: [],
   internalDamages: [],
   externalSelections: [],
@@ -271,6 +272,7 @@ export const App: React.FC = () => {
   const currentSelection: LineSelection = {
     ...currentLine.selection,
     mode: currentLine.selection.mode || activeTab?.basicInfo.surveyType || '外部',
+    memo: currentLine.selection.memo || '',
     internalSelections: currentLine.selection.internalSelections || [],
     internalDamages: currentLine.selection.internalDamages || [],
     externalSelections: currentLine.selection.externalSelections || [],
@@ -319,7 +321,27 @@ export const App: React.FC = () => {
   // 基本情報保存
   const handleSaveBasicInfo = (newInfo: BasicInfo) => {
     setTabs((prev) =>
-      prev.map((t) => (t.id === activeTabId ? { ...t, basicInfo: newInfo } : t))
+      prev.map((t) => {
+        if (t.id !== activeTabId) return t;
+
+        const updatedLines = [...t.lines];
+        if (updatedLines[t.currentLineIndex]) {
+          const currentLine = updatedLines[t.currentLineIndex];
+          updatedLines[t.currentLineIndex] = {
+            ...currentLine,
+            selection: {
+              ...currentLine.selection,
+              mode: newInfo.surveyType,
+            },
+          };
+        }
+
+        return {
+          ...t,
+          basicInfo: newInfo,
+          lines: updatedLines,
+        };
+      })
     );
   };
 

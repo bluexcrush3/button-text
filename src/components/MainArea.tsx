@@ -1,6 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
-import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers, ChevronDown, ChevronUp, StickyNote } from 'lucide-react';
 import { VoiceInputModal } from './VoiceInputModal';
 
 interface MainAreaProps {
@@ -1856,6 +1856,55 @@ export const MainArea: React.FC<MainAreaProps> = ({
     );
   };
 
+  const renderMemoGroup = (label: string = 'メモグループ') => (
+    <section
+      style={{
+        border: '2px solid var(--border-color)',
+        borderRadius: '8px',
+        padding: '10px 12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+      }}
+    >
+      <div
+        style={{
+          fontWeight: 'bold',
+          fontSize: '0.95rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <StickyNote size={18} />
+          {label}
+        </span>
+      </div>
+
+      <input
+        type="text"
+        className="stepper-input"
+        placeholder="メモ入力"
+        value={selection.memo || ''}
+        onChange={(e) =>
+          onChangeSelection({
+            ...selection,
+            memo: e.target.value,
+          })
+        }
+        style={{
+          width: '100%',
+          height: '42px',
+          fontSize: '0.95rem',
+          textAlign: 'left',
+          padding: '0 10px',
+          boxSizing: 'border-box',
+        }}
+      />
+    </section>
+  );
+
   return (
     <main className="main-content">
       {/* モード切替エリア & クリアボタン */}
@@ -2570,6 +2619,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
             />
           </section>
 
+          {/* メモグループ */}
+          {renderMemoGroup('メモグループ')}
+
           {/* ④ ボタン管理・種類設定と並び替え */}
           <section
             style={{
@@ -3264,6 +3316,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
               }}
             />
           </section>
+
+          {/* メモグループ */}
+          {renderMemoGroup('メモグループ')}
 
           {/* ⑥ 傾斜用カスタムボタン管理エリア */}
           <section
@@ -4125,6 +4180,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
               }}
             />
           </section>
+
+          {/* メモグループ */}
+          {renderMemoGroup('メモグループ')}
 
           {/* 外部用カスタムボタン管理・種類設定 */}
           <section

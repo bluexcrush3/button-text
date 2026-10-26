@@ -38,15 +38,15 @@ export const SituationHouseModal: React.FC<SituationHouseModalProps> = ({
 
   if (!isOpen) return null;
 
-  // 1桁の場合は「01」のように2桁ゼロ埋め
+  // ゼロパディングなし（例: 1 -> 家屋№.1より撮影、3 -> 家屋№.3より撮影）
   const formatResultText = (val: string): string => {
     const trimmed = val.trim();
     if (!trimmed) {
       return '家屋№.より撮影';
     }
     const n = parseInt(trimmed, 10);
-    const pad = isNaN(n) ? trimmed : (n < 10 && n >= 0 ? `0${n}` : `${n}`);
-    return `家屋№.${pad}より撮影`;
+    const numStr = isNaN(n) ? trimmed : `${n}`;
+    return `家屋№.${numStr}より撮影`;
   };
 
   const previewText = formatResultText(inputNumber);
@@ -196,7 +196,7 @@ export const SituationHouseModal: React.FC<SituationHouseModalProps> = ({
               inputMode="numeric"
               pattern="[0-9]*"
               className="stepper-input"
-              placeholder="家屋番号 (例: 1, 01)"
+              placeholder="家屋番号 (例: 1, 3)"
               value={inputNumber}
               onChange={(e) => {
                 const val = e.target.value.replace(/[^0-9]/g, '');

@@ -2,6 +2,8 @@ import React, { useState, useRef, useMemo } from 'react';
 import { LineSelection, SurveyType, DamageItem, CustomButtonConfig, CustomButtonCategory, VoiceInputItem } from '../types';
 import { MapPin, Compass, Box, AlertCircle, Plus, Minus, RotateCcw, FileText, GripVertical, Mic, Layers, ChevronDown, ChevronUp, StickyNote } from 'lucide-react';
 import { VoiceInputModal } from './VoiceInputModal';
+import { OpenFailureModal } from './OpenFailureModal';
+import { SituationHouseModal } from './SituationHouseModal';
 
 interface MainAreaProps {
   surveyType: SurveyType;
@@ -19,8 +21,8 @@ interface MainAreaProps {
 const DEFAULT_LOCATION_OPTIONS = ['建物', '外構', '土間', '塀', '植込', '擁壁'];
 const DEFAULT_DIRECTION_OPTIONS = ['北', '西', '南', '東'];
 const DEFAULT_PART_OPTIONS = ['壁', '腰', '軒', '屋根'];
-const DEFAULT_DAMAGE_OPTIONS = ['現況', '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ', '全景'];
-const DEFAULT_INTERNAL_SITUATION_OPTIONS = ['現況', '全景'];
+const DEFAULT_DAMAGE_OPTIONS = ['現況', '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '割れ', 'ズレ', '開閉不良', '全景'];
+const DEFAULT_INTERNAL_SITUATION_OPTIONS = ['現況', '開閉不良', '全景'];
 
 const STORAGE_KEY_LOCATION_ORDER = 'btn_text_gen_location_order_v2';
 const STORAGE_KEY_DIRECTION_ORDER = 'btn_text_gen_direction_order_v2';
@@ -120,6 +122,9 @@ export const MainArea: React.FC<MainAreaProps> = ({
   onChangeInclinationCustomButtons,
 }) => {
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isOpenFailureModalOpen, setIsOpenFailureModalOpen] = useState(false);
+  const [openFailureTargetIndex, setOpenFailureTargetIndex] = useState<number | null>(null);
+  const [isSituationHouseModalOpen, setIsSituationHouseModalOpen] = useState(false);
   const activeLocation =
     selection.location.selectedLocation ?? (selection.location.isBuilding ? '建物' : null);
   const isFloorDisabled = activeLocation === '塀' || activeLocation === '土間';
@@ -433,6 +438,115 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
+  // 開閉不良ボタン押下ハンドラー（独自仕様：ポップアップ表示）
+  const handleOpenFailureButtonClick = () => {
+    const current = selection.damages || [];
+    const existingIndex = current.findIndex(
+      (d) => d.name === '開閉不良' || d.name.replace(/^[左右上下]/, '') === '開閉不良'
+    );
+
+    if (existingIndex !== -1) {
+      setOpenFailureTargetIndex(existingIndex);
+      setIsOpenFailureModalOpen(true);
+    } else {
+      const newItem: DamageItem = { name: '開閉不良', valueW: 0, valueL: 0, preset: null };
+      let next: DamageItem[];
+      if (selection.situationButton) {
+        next = [newItem];
+      } else if (current.length >= 2) {
+        next = [current[1], newItem];
+      } else {
+        next = [...current, newItem];
+      }
+
+      const activeDamageNames = new Set(next.map((d) => d.name.replace(/^[左右上下]/, '')));
+      const nextCustomSelections = currentCustomSelections.filter((name) => {
+        const customBase = name.replace(/[①-⑳]/g, '').replace(/^[左右上下]/, '');
+        const btnConfig = displayedCustomButtons.find((b) => b.name === name || b.name === customBase);
+        if (btnConfig?.category === '損傷') {
+          return activeDamageNames.has(name) || activeDamageNames.has(customBase);
+        }
+        return true;
+      });
+      const nextCustomDamages = currentCustomDamages.filter((d) =>
+        activeDamageNames.has(d.name) || activeDamageNames.has(d.name.replace(/^[左右上下]/, ''))
+      );
+
+      if (isModeInternal) {
+        onChangeSelection({
+          ...selection,
+          damages: next,
+          internalSelections: nextCustomSelections,
+          internalDamages: nextCustomDamages,
+          situationButton: null,
+        });
+      } else {
+        onChangeSelection({
+          ...selection,
+          damages: next,
+          externalSelections: nextCustomSelections,
+          externalDamages: nextCustomDamages,
+          situationButton: null,
+        });
+      }
+
+      setOpenFailureTargetIndex(next.length - 1);
+      setIsOpenFailureModalOpen(true);
+    }
+  };
+
+  const handleSelectOpenFailurePreset = (preset: string) => {
+    const current = [...(selection.damages || [])];
+    const targetIdx = openFailureTargetIndex !== null
+      ? openFailureTargetIndex
+      : current.findIndex((d) => d.name === '開閉不良' || d.name.replace(/^[左右上下]/, '') === '開閉不良');
+
+    if (targetIdx !== -1 && current[targetIdx]) {
+      current[targetIdx] = {
+        ...current[targetIdx],
+        preset,
+      };
+      onChangeSelection({
+        ...selection,
+        damages: current,
+        situationButton: null,
+      });
+    }
+    setIsOpenFailureModalOpen(false);
+  };
+
+  const handleClearOpenFailurePreset = () => {
+    const current = [...(selection.damages || [])];
+    const targetIdx = openFailureTargetIndex !== null
+      ? openFailureTargetIndex
+      : current.findIndex((d) => d.name === '開閉不良' || d.name.replace(/^[左右上下]/, '') === '開閉不良');
+
+    if (targetIdx !== -1 && current[targetIdx]) {
+      current[targetIdx] = {
+        ...current[targetIdx],
+        preset: null,
+      };
+      onChangeSelection({
+        ...selection,
+        damages: current,
+        situationButton: null,
+      });
+    }
+    setIsOpenFailureModalOpen(false);
+  };
+
+  const handleRemoveOpenFailureDamage = () => {
+    const current = selection.damages || [];
+    const targetIdx = openFailureTargetIndex !== null
+      ? openFailureTargetIndex
+      : current.findIndex((d) => d.name === '開閉不良' || d.name.replace(/^[左右上下]/, '') === '開閉不良');
+
+    if (targetIdx !== -1 && current[targetIdx]) {
+      handleDamageToggle(current[targetIdx].name);
+    }
+    setIsOpenFailureModalOpen(false);
+  };
+
   const currentMode = selection.mode || '外部';
   const isModeInternal = currentMode === '内部';
   const isModeInclination = currentMode === '傾斜';
@@ -688,16 +802,29 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
-  // 状況グループのプリセットボタンハンドラー（現場、家屋、その他）
+  // 状況グループのプリセットボタンハンドラー（現場、その他）
   const handleSituationPreset = (presetText: string) => {
-    const isCurrentlyActive =
-      presetText === '家屋№.より撮影'
-        ? (selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.'))
-        : selection.situationText === presetText;
+    const isCurrentlyActive = selection.situationText === presetText;
 
     onChangeSelection({
       ...selection,
       situationText: isCurrentlyActive ? '' : presetText,
+    });
+  };
+
+  // 家屋番号ポップアップの確定ハンドラー
+  const handleConfirmSituationHouseText = (formattedText: string) => {
+    onChangeSelection({
+      ...selection,
+      situationText: formattedText,
+    });
+  };
+
+  // 家屋番号ポップアップのクリアハンドラー
+  const handleClearSituationHouseText = () => {
+    onChangeSelection({
+      ...selection,
+      situationText: '',
     });
   };
 
@@ -1635,7 +1762,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
     );
   };
 
-  // 各グループへ既存ボタン＋カスタムボタンを統合して描画するヘルパー
+  // 各グループへ既存ボタン＋カスタムボタンを統合して描画するヘルパー（同名ボタンもそれぞれ別々に描画）
   const renderUnifiedCategoryButtons = (
     cat: CustomButtonCategory,
     defaultOptions: string[],
@@ -1645,26 +1772,52 @@ export const MainArea: React.FC<MainAreaProps> = ({
     gridColumns: string = 'repeat(4, 1fr)',
     isDisabled: boolean = false
   ) => {
+    interface UnifiedButtonItem {
+      key: string;
+      name: string;
+      isCustom: boolean;
+      customConfig?: CustomButtonConfig;
+    }
+
     const customBtns = displayedCustomButtons.filter(
       (b) => b.category === cat && !b.isVoice && b.name !== '音声入力'
     );
-    const customMap = new Map(customBtns.map((b) => [b.name, b]));
 
-    const allAvailableNames = new Set([...defaultOptions, ...customBtns.map((b) => b.name)]);
+    const availableItems: UnifiedButtonItem[] = [
+      ...defaultOptions.map((name) => ({
+        key: `default:${cat}:${name}`,
+        name,
+        isCustom: false,
+      })),
+      ...customBtns.map((b) => ({
+        key: `custom:${b.id}`,
+        name: b.name,
+        isCustom: true,
+        customConfig: b,
+      })),
+    ];
 
-    const orderedList: string[] = [];
-    orderedOptions.forEach((name) => {
-      if (allAvailableNames.has(name) && !orderedList.includes(name)) {
-        orderedList.push(name);
+    const orderedItems: UnifiedButtonItem[] = [];
+    const usedKeys = new Set<string>();
+
+    orderedOptions.forEach((optName) => {
+      const match = availableItems.find(
+        (it) => it.name === optName && !usedKeys.has(it.key)
+      );
+      if (match) {
+        orderedItems.push(match);
+        usedKeys.add(match.key);
       }
     });
-    allAvailableNames.forEach((name) => {
-      if (!orderedList.includes(name)) {
-        orderedList.push(name);
+
+    availableItems.forEach((it) => {
+      if (!usedKeys.has(it.key)) {
+        orderedItems.push(it);
+        usedKeys.add(it.key);
       }
     });
 
-    if (orderedList.length === 0) return null;
+    if (orderedItems.length === 0) return null;
 
     return (
       <div
@@ -1675,19 +1828,19 @@ export const MainArea: React.FC<MainAreaProps> = ({
           marginTop: '6px',
         }}
       >
-        {orderedList.map((btnName) => {
-          const customConfig = customMap.get(btnName);
-          const { dragClass, cursorStyle, dragEvents } = getDragProps(dragType, btnName, isDisabled);
+        {orderedItems.map((item) => {
+          const { dragClass, cursorStyle, dragEvents } = getDragProps(dragType, item.name, isDisabled);
 
-          if (customConfig) {
+          if (item.isCustom && item.customConfig) {
+            const customConfig = item.customConfig;
             const isVoice = customConfig.isVoice || customConfig.name === '音声入力';
             const baseName = customConfig.name;
             const isLocation = customConfig.category === '場所';
             const selectedIndex = currentCustomSelections.findIndex(
-              (item) =>
-                item === baseName ||
-                item.replace(/^[左右上下]/, '') === baseName ||
-                (isLocation && item.startsWith(baseName) && /[①-⑳]$/.test(item))
+              (it) =>
+                it === baseName ||
+                it.replace(/^[左右上下]/, '') === baseName ||
+                (isLocation && it.startsWith(baseName) && /[①-⑳]$/.test(it))
             );
             const isSelected = selectedIndex !== -1;
             const displayName = isSelected ? currentCustomSelections[selectedIndex] : baseName;
@@ -1695,7 +1848,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
             if (isVoice) {
               return (
                 <button
-                  key={customConfig.id}
+                  key={item.key}
                   type="button"
                   className="btn"
                   onClick={() => setIsVoiceModalOpen(true)}
@@ -1723,7 +1876,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
 
             return (
               <button
-                key={customConfig.id}
+                key={item.key}
                 type="button"
                 disabled={isDisabled}
                 className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
@@ -1745,12 +1898,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
               </button>
             );
           } else {
+            const btnName = item.name;
             const adaptiveStyle = getAdaptiveButtonTextStyle(btnName, buttonStyle.fontSize);
             if (cat === '場所') {
               const isSelected = activeLocation === btnName;
               return (
                 <button
-                  key={btnName}
+                  key={item.key}
                   type="button"
                   disabled={isDisabled}
                   className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
@@ -1775,7 +1929,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               const isSelected = selection.part === btnName;
               return (
                 <button
-                  key={btnName}
+                  key={item.key}
                   type="button"
                   disabled={isDisabled}
                   className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
@@ -1800,7 +1954,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 const isSelected = selection.situationButton === btnName;
                 return (
                   <button
-                    key={btnName}
+                    key={item.key}
                     type="button"
                     disabled={isDisabled}
                     className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
@@ -1823,12 +1977,41 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 );
               }
 
+              if (btnName === '開閉不良') {
+                const isSelected = (selection.damages || []).some(
+                  (d) => d.name === '開閉不良' || d.name.replace(/^[左右上下]/, '') === '開閉不良'
+                );
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    disabled={isDisabled}
+                    className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      handleOpenFailureButtonClick();
+                    }}
+                    {...dragEvents}
+                    style={{
+                      ...buttonStyle,
+                      ...adaptiveStyle,
+                      fontWeight: 'bold',
+                      cursor: isDisabled ? 'not-allowed' : 'grab',
+                      opacity: isDisabled ? 0.5 : 1,
+                      ...cursorStyle,
+                    }}
+                  >
+                    {btnName}
+                  </button>
+                );
+              }
+
               const isSelected = (selection.damages || []).some(
                 (d) => d.name === btnName || d.name.replace(/^[左右上下]/, '') === btnName
               );
               return (
                 <button
-                  key={btnName}
+                  key={item.key}
                   type="button"
                   disabled={isDisabled}
                   className={`btn ${isSelected ? 'selected' : ''} ${dragClass}`}
@@ -1880,6 +2063,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
           <StickyNote size={18} />
           {label}
         </span>
+        <button
+          type="button"
+          onClick={() => onChangeSelection({ ...selection, memo: '' })}
+          style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#64748b', cursor: 'pointer' }}
+        >
+          クリア
+        </button>
       </div>
 
       <input
@@ -2412,6 +2602,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       >
                         多数
                       </button>
+                      {dmg.name.replace(/^[左右上下]/, '') === '開閉不良' && (
+                        <button
+                          type="button"
+                          className={`btn ${dmg.preset ? 'selected' : ''}`}
+                          onClick={() => {
+                            setOpenFailureTargetIndex(idx);
+                            setIsOpenFailureModalOpen(true);
+                          }}
+                          style={{
+                            height: '28px',
+                            fontSize: '0.75rem',
+                            padding: '0 8px',
+                            fontWeight: 'bold',
+                          }}
+                          title="開閉不良の補足指定（重し、上ツマリ等）"
+                        >
+                          {dmg.preset ? `補足: ${dmg.preset}` : '補足設定'}
+                        </button>
+                      )}
                     </div>
 
                     {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}
@@ -2548,6 +2757,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 <FileText size={18} />
                 状況・補足テキスト
               </span>
+              <button
+                type="button"
+                onClick={() => onChangeSelection({ ...selection, situationText: '' })}
+                style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#64748b', cursor: 'pointer' }}
+              >
+                クリア
+              </button>
             </div>
 
             {/* ボタンエリア（上） */}
@@ -2573,7 +2789,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               <button
                 type="button"
                 className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
-                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                onClick={() => setIsSituationHouseModalOpen(true)}
                 style={{
                   height: '38px',
                   fontSize: '0.95rem',
@@ -3246,6 +3462,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 <FileText size={18} />
                 ⑤ 状況グループ
               </span>
+              <button
+                type="button"
+                onClick={() => onChangeSelection({ ...selection, situationText: '' })}
+                style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#64748b', cursor: 'pointer' }}
+              >
+                クリア
+              </button>
             </div>
 
             {/* ボタンエリア（上） */}
@@ -3271,7 +3494,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               <button
                 type="button"
                 className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
-                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                onClick={() => setIsSituationHouseModalOpen(true)}
                 style={{
                   height: '38px',
                   fontSize: '0.95rem',
@@ -3972,6 +4195,25 @@ export const MainArea: React.FC<MainAreaProps> = ({
                       >
                         多数
                       </button>
+                      {dmg.name.replace(/^[左右上下]/, '') === '開閉不良' && (
+                        <button
+                          type="button"
+                          className={`btn ${dmg.preset ? 'selected' : ''}`}
+                          onClick={() => {
+                            setOpenFailureTargetIndex(idx);
+                            setIsOpenFailureModalOpen(true);
+                          }}
+                          style={{
+                            height: '28px',
+                            fontSize: '0.75rem',
+                            padding: '0 8px',
+                            fontWeight: 'bold',
+                          }}
+                          title="開閉不良の補足指定（重し、上ツマリ等）"
+                        >
+                          {dmg.preset ? `補足: ${dmg.preset}` : '補足設定'}
+                        </button>
+                      )}
                     </div>
 
                     {/* 数値(W/L)入力ボックス（「全体」「多数」選択時も入力可能） */}
@@ -4110,6 +4352,13 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 <FileText size={18} />
                 ⑥ 状況グループ
               </span>
+              <button
+                type="button"
+                onClick={() => onChangeSelection({ ...selection, situationText: '' })}
+                style={{ fontSize: '0.75rem', padding: '2px 8px', color: '#64748b', cursor: 'pointer' }}
+              >
+                クリア
+              </button>
             </div>
 
             {/* ボタンエリア（上） */}
@@ -4135,7 +4384,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
               <button
                 type="button"
                 className={`btn ${selection.situationText === '家屋№.より撮影' || (selection.situationText ?? '').startsWith('家屋№.') ? 'selected' : ''}`}
-                onClick={() => handleSituationPreset('家屋№.より撮影')}
+                onClick={() => setIsSituationHouseModalOpen(true)}
                 style={{
                   height: '38px',
                   fontSize: '0.95rem',
@@ -4560,6 +4809,34 @@ export const MainArea: React.FC<MainAreaProps> = ({
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
         onRegister={handleRegisterVoiceText}
+      />
+
+      {/* 開閉不良 損傷補足モーダル */}
+      <OpenFailureModal
+        isOpen={isOpenFailureModalOpen}
+        onClose={() => setIsOpenFailureModalOpen(false)}
+        currentPreset={
+          openFailureTargetIndex !== null && selection.damages?.[openFailureTargetIndex]
+            ? selection.damages[openFailureTargetIndex].preset
+            : selection.damages?.find((d) => d.name.replace(/^[左右上下]/, '') === '開閉不良')?.preset
+        }
+        damageName={
+          openFailureTargetIndex !== null && selection.damages?.[openFailureTargetIndex]
+            ? selection.damages[openFailureTargetIndex].name
+            : '開閉不良'
+        }
+        onSelectPreset={handleSelectOpenFailurePreset}
+        onClearPreset={handleClearOpenFailurePreset}
+        onRemoveDamage={handleRemoveOpenFailureDamage}
+      />
+
+      {/* 家屋番号（状況テキスト）入力モーダル */}
+      <SituationHouseModal
+        isOpen={isSituationHouseModalOpen}
+        onClose={() => setIsSituationHouseModalOpen(false)}
+        currentSituationText={selection.situationText}
+        onConfirm={handleConfirmSituationHouseText}
+        onClear={handleClearSituationHouseText}
       />
     </main>
   );

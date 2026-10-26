@@ -367,8 +367,8 @@ export const App: React.FC = () => {
     );
   };
 
-  // 1行前（前回）の選択情報をコピー
-  const handleCopyPrevLine = () => {
+  // 1行前（前回）の選択情報をコピー（excludeDirections: true の場合は方位を引き継がない「部屋同じ」）
+  const copyPrevLineSelection = (excludeDirections: boolean = false) => {
     if (!activeTab || activeTab.currentLineIndex <= 0) return;
 
     const prevSelection = activeTab.lines[activeTab.currentLineIndex - 1].selection;
@@ -380,6 +380,11 @@ export const App: React.FC = () => {
     copiedSelection.internalDamages = [];
     copiedSelection.externalDamages = [];
     copiedSelection.inclinationValues = [];
+
+    // 「部屋同じ」ボタンは方位のみ引き継がない
+    if (excludeDirections) {
+      copiedSelection.directions = [];
+    }
 
     // 「現況」ボタンのみはそのまま情報を引き継ぐ（それ以外の「全景」などは引き継がない）
     if (copiedSelection.situationButton !== '現況') {
@@ -426,6 +431,9 @@ export const App: React.FC = () => {
 
     handleChangeSelection(copiedSelection);
   };
+
+  const handleCopyPrevLine = () => copyPrevLineSelection(false);
+  const handleCopySameRoom = () => copyPrevLineSelection(true);
 
   // 現在行の直後に行（ページ）を挿入して移動
   const handleInsertLineAfterCurrent = () => {
@@ -563,6 +571,7 @@ export const App: React.FC = () => {
         onNextLine={handleNextLine}
         onOpenAllText={() => setIsAllTextOpen(true)}
         onCopyPrevLine={handleCopyPrevLine}
+        onCopySameRoom={handleCopySameRoom}
         onInsertLine={handleInsertLineAfterCurrent}
         onDeleteLine={handleDeleteCurrentLine}
         canPrev={activeTab ? activeTab.currentLineIndex > 0 : false}

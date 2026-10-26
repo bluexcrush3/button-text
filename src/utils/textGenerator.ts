@@ -277,7 +277,13 @@ export function buildDamageItemString(d: DamageItem, btnName?: string): string {
     valStr = `${lStr}`;
   }
 
-  const presetText = (d.preset === '全般' || d.preset === '全体') ? '全体' : (d.preset === '多数' ? '多数' : '');
+  let presetText = '';
+  if (d.preset) {
+    if (d.preset === '全体') presetText = '全体';
+    else if (d.preset === '多数') presetText = '多数';
+    else if (d.preset === '全般') presetText = '全般';
+    else presetText = d.preset;
+  }
   if (presetText) {
     valStr = valStr ? `${valStr}${presetText}` : presetText;
   }
@@ -354,7 +360,13 @@ export function formatDamageValueDetail(item: DamageItem, isInclination: boolean
     numStr = `L=${lStr}`;
   }
 
-  const presetText = (item.preset === '全般' || item.preset === '全体') ? '全体' : (item.preset === '多数' ? '多数' : '');
+  let presetText = '';
+  if (item.preset) {
+    if (item.preset === '全体') presetText = '全体';
+    else if (item.preset === '多数') presetText = '多数';
+    else if (item.preset === '全般') presetText = '全般';
+    else presetText = item.preset;
+  }
   if (presetText) {
     return numStr ? `${numStr}　${presetText}` : presetText;
   }

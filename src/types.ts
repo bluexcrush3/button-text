@@ -29,15 +29,31 @@ export interface LocationData {
   floor2: number;      // 階数② (0 = 未入力)
 }
 
+export const OPEN_FAILURE_PRESETS = [
+  '重し',
+  '上ツマリ',
+  '下ツマリ',
+  '上スリ',
+  '下スリ',
+  '横アタリ',
+  '下アタリ',
+  'ガタツキ',
+  '全般',
+  '鳴り',
+  '自動開閉',
+] as const;
+
+export type OpenFailurePreset = typeof OPEN_FAILURE_PRESETS[number];
+
 /**
  * ④ 損傷グループの各項目
  */
 export interface DamageItem {
-  name: string;  // '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離'
+  name: string;  // '亀裂', '隙間', 'HC', '欠落', '目地切', '剥離', '開閉不良' など
   valueW: number; // 数値W (W寸法, 0 = 入力なし)
   valueL: number; // 数値L (L寸法, 0 = 入力なし)
   hasL?: boolean; // 数値L入力有無 (「L有」ボタン)
-  preset?: '全体' | '全般' | '多数' | null; // 全体 / 多数 選択肢 ('全般'は旧データ互換用)
+  preset?: string | null; // 全体 / 多数 / 開閉不良の補足（重し、上ツマリ等）
   isLessThan?: boolean; // 「以下」フラグ (<〇〇)
   value?: number; // 互換性用
   directions?: string[]; // 傾斜モード等での方向指定 ['南', '北'] / ['東', '西']

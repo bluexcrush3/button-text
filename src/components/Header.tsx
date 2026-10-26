@@ -17,6 +17,7 @@ interface HeaderProps {
   onNextLine: () => void;
   onOpenAllText: () => void;
   onCopyPrevLine: () => void;
+  onCopySameRoom: () => void;
   onInsertLine: () => void;
   onDeleteLine: () => void;
   canPrev: boolean;
@@ -37,6 +38,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNextLine,
   onOpenAllText,
   onCopyPrevLine,
+  onCopySameRoom,
   onInsertLine,
   onDeleteLine,
   canPrev,
@@ -208,14 +210,23 @@ export const Header: React.FC<HeaderProps> = ({
       {/* 3行目: 基本情報サマリー ＆ 「＋」「前回と同じ」ボタン */}
       {activeTab && (
         <div className="header-row-3">
+          {/* ボタン配置用エリア（レイアウト維持のためコンテナを残す） */}
           <div className="status-badges-group">
-            <div className="status-badge" style={{ fontWeight: 'bold' }}>
-              {activeTab.basicInfo.projectNumber ? `[${activeTab.basicInfo.projectNumber}] ` : ''}
-              {activeTab.basicInfo.surveyDate ? `${activeTab.basicInfo.surveyDate} ` : ''}家屋{String(activeTab.basicInfo.houseNumber).padStart(2, '0')}{activeTab.basicInfo.surveyNumber || ''} {activeTab.basicInfo.surveyType} {activeTab.basicInfo.investigator} #{activeTab.basicInfo.folderNumber}
-            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
+            {/* 「部屋同じ」ボタン（方位以外を前回からコピー） */}
+            <button
+              type="button"
+              className="btn-copy-prev"
+              onClick={onCopySameRoom}
+              disabled={!canCopyPrev}
+              title="1つ前の行のボタン選択（方位以外）をコピー"
+            >
+              <Copy size={13} />
+              部屋同じ
+            </button>
+
             {/* 一括音声入力ボタン（傾斜モードなら傾音声、それ以外はW音声） */}
             {currentSelection && onChangeSelection && (
               currentMode === '傾斜' ? (

@@ -64,13 +64,16 @@ const ensureVoiceButton = (buttons: CustomButtonConfig[], voiceConfig: CustomBut
   return buttons.map((b) => (b.name === '音声入力' || b.id === voiceConfig.id ? { ...b, isVoice: true } : b));
 };
 
-const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelection => ({
+const createInitialSelection = (
+  defaultMode: SurveyType = '外部',
+  initialFloor?: { floor1: number; floor2: number }
+): LineSelection => ({
   mode: defaultMode,
   location: {
     isBuilding: false, // デフォルト未選択
     selectedLocation: null,
-    floor1: 0,        // デフォルト未選択 (0)
-    floor2: 0,
+    floor1: initialFloor?.floor1 ?? 0,        // 内部モード等で引き継がれた階数 (0 = 未入力)
+    floor2: initialFloor?.floor2 ?? 0,
   },
   directions: [],
   part: null,
@@ -87,10 +90,35 @@ const createInitialSelection = (defaultMode: SurveyType = '外部'): LineSelecti
   voiceItems: [],
 });
 
-const createInitialLine = (defaultMode: SurveyType = '外部'): LineData => ({
+const createInitialLine = (
+  defaultMode: SurveyType = '外部',
+  initialFloor?: { floor1: number; floor2: number }
+): LineData => ({
   id: `line-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-  selection: createInitialSelection(defaultMode),
+  selection: createInitialSelection(defaultMode, initialFloor),
 });
+
+// 直前（または直近）の内部モードで入力されていた階数を取得
+const getPreviousInternalFloor = (
+  lines: LineData[],
+  fromIndex: number,
+  surveyType: SurveyType
+): { floor1: number; floor2: number } => {
+  for (let i = fromIndex; i >= 0; i--) {
+    const line = lines[i];
+    if (line) {
+      const mode = line.selection.mode || surveyType;
+      if (mode === '内部') {
+        const f1 = line.selection.location?.floor1 || 0;
+        const f2 = line.selection.location?.floor2 || 0;
+        if (f1 > 0 || f2 > 0) {
+          return { floor1: f1, floor2: f2 };
+        }
+      }
+    }
+  }
+  return { floor1: 0, floor2: 0 };
+};
 
 const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData => {
   const defaultMode = basicInfo?.surveyType || '外部';
@@ -443,7 +471,13 @@ export const App: React.FC = () => {
       prev.map((t) => {
         if (t.id !== activeTabId) return t;
 
-        const newLine = createInitialLine(t.basicInfo.surveyType);
+        const currentMode = t.lines[t.currentLineIndex]?.selection.mode || t.basicInfo.surveyType;
+        const initialFloor =
+          currentMode === '内部'
+            ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
+            : undefined;
+
+        const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor);
         const updatedLines = [...t.lines];
         const insertIndex = t.currentLineIndex + 1;
         updatedLines.splice(insertIndex, 0, newLine);
@@ -541,16 +575,62 @@ export const App: React.FC = () => {
 
         const isLastLine = t.currentLineIndex === t.lines.length - 1;
         if (isLastLine) {
-          const newLine = createInitialLine(t.basicInfo.surveyType);
+          const currentMode = t.lines[t.currentLineIndex]?.selection.mode || t.basicInfo.surveyType;
+          const initialFloor =
+            currentMode === '内部'
+              ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
+              : undefined;
+
+          const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor);
           return {
             ...t,
             lines: [...t.lines, newLine],
             currentLineIndex: t.lines.length,
           };
         } else {
+          const nextIndex = t.currentLineIndex + 1;
+          const nextLine = t.lines[nextIndex];
+          const nextMode = nextLine?.selection.mode || t.basicInfo.surveyType;
+
+          // 内部モードで、かつ進み先の行が完全に未入力で階数が0の場合、前ページの階数を初期値として適用
+          if (
+            nextMode === '内部' &&
+            nextLine &&
+            (nextLine.selection.location?.floor1 === 0 || !nextLine.selection.location?.floor1) &&
+            (nextLine.selection.location?.floor2 === 0 || !nextLine.selection.location?.floor2) &&
+            !nextLine.selection.location?.selectedLocation &&
+            (!nextLine.selection.directions || nextLine.selection.directions.length === 0) &&
+            !nextLine.selection.part &&
+            (!nextLine.selection.damages || nextLine.selection.damages.length === 0) &&
+            !nextLine.selection.situationButton &&
+            !nextLine.selection.situationText &&
+            !nextLine.selection.memo
+          ) {
+            const initialFloor = getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType);
+            if (initialFloor.floor1 > 0 || initialFloor.floor2 > 0) {
+              const updatedLines = [...t.lines];
+              updatedLines[nextIndex] = {
+                ...nextLine,
+                selection: {
+                  ...nextLine.selection,
+                  location: {
+                    ...nextLine.selection.location,
+                    floor1: initialFloor.floor1,
+                    floor2: initialFloor.floor2,
+                  },
+                },
+              };
+              return {
+                ...t,
+                lines: updatedLines,
+                currentLineIndex: nextIndex,
+              };
+            }
+          }
+
           return {
             ...t,
-            currentLineIndex: t.currentLineIndex + 1,
+            currentLineIndex: nextIndex,
           };
         }
       })

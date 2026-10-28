@@ -61,11 +61,15 @@ export interface DamageItem {
 
 export type CustomButtonCategory = '場所' | '階数' | '部位' | '損傷' | '未定義';
 
+export const KANA_GROUPS = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', 'A'] as const;
+export type KanaGroup = typeof KANA_GROUPS[number];
+
 export interface CustomButtonConfig {
   id: string;
   name: string;
   category: CustomButtonCategory;
   isVoice?: boolean;
+  kanaGroup?: KanaGroup;
 }
 
 export interface VoiceInputItem {

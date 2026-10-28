@@ -64,14 +64,26 @@ const ensureVoiceButton = (buttons: CustomButtonConfig[], voiceConfig: CustomBut
   return buttons.map((b) => (b.name === '音声入力' || b.id === voiceConfig.id ? { ...b, isVoice: true } : b));
 };
 
+interface InitialFloor {
+  floor1: number;
+  floor2: number;
+}
+
+interface InitialLocation {
+  selectedLocation: string | null;
+  isBuilding: boolean;
+  internalLocationSelections?: string[];
+}
+
 const createInitialSelection = (
   defaultMode: SurveyType = '外部',
-  initialFloor?: { floor1: number; floor2: number }
+  initialFloor?: InitialFloor,
+  initialLocation?: InitialLocation
 ): LineSelection => ({
   mode: defaultMode,
   location: {
-    isBuilding: false, // デフォルト未選択
-    selectedLocation: null,
+    isBuilding: initialLocation?.isBuilding ?? false,
+    selectedLocation: initialLocation?.selectedLocation ?? null,
     floor1: initialFloor?.floor1 ?? 0,        // 内部モード等で引き継がれた階数 (0 = 未入力)
     floor2: initialFloor?.floor2 ?? 0,
   },
@@ -81,7 +93,7 @@ const createInitialSelection = (
   situationButton: null, // デフォルト未選択
   situationText: '',
   memo: '',
-  internalSelections: [],
+  internalSelections: initialLocation?.internalLocationSelections ? [...initialLocation.internalLocationSelections] : [],
   internalDamages: [],
   externalSelections: [],
   externalDamages: [],
@@ -92,10 +104,11 @@ const createInitialSelection = (
 
 const createInitialLine = (
   defaultMode: SurveyType = '外部',
-  initialFloor?: { floor1: number; floor2: number }
+  initialFloor?: InitialFloor,
+  initialLocation?: InitialLocation
 ): LineData => ({
   id: `line-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-  selection: createInitialSelection(defaultMode, initialFloor),
+  selection: createInitialSelection(defaultMode, initialFloor, initialLocation),
 });
 
 // 直前（または直近）の内部モードで入力されていた階数を取得
@@ -118,6 +131,57 @@ const getPreviousInternalFloor = (
     }
   }
   return { floor1: 0, floor2: 0 };
+};
+
+// 直前（または直近）の内部モードで入力されていた場所を取得
+const getPreviousInternalLocation = (
+  lines: LineData[],
+  fromIndex: number,
+  surveyType: SurveyType,
+  internalCustomButtons: CustomButtonConfig[]
+): InitialLocation => {
+  const locationBtnNames = new Set(
+    internalCustomButtons.filter((b) => b.category === '場所').map((b) => b.name)
+  );
+
+  for (let i = fromIndex; i >= 0; i--) {
+    const line = lines[i];
+    if (line) {
+      const mode = line.selection.mode || surveyType;
+      if (mode === '内部') {
+        // 1. 固定場所のチェック
+        const selLoc = line.selection.location?.selectedLocation;
+        const isBld = !!line.selection.location?.isBuilding;
+        if (selLoc || isBld) {
+          return {
+            selectedLocation: selLoc || (isBld ? '建物' : null),
+            isBuilding: isBld,
+            internalLocationSelections: [],
+          };
+        }
+
+        // 2. カスタム場所のチェック
+        const customLocs = (line.selection.internalSelections || []).filter((item) => {
+          const baseName = item.replace(/[①-⑳]/g, '');
+          return locationBtnNames.has(item) || locationBtnNames.has(baseName);
+        });
+
+        if (customLocs.length > 0) {
+          return {
+            selectedLocation: null,
+            isBuilding: false,
+            internalLocationSelections: customLocs,
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    selectedLocation: null,
+    isBuilding: false,
+    internalLocationSelections: [],
+  };
 };
 
 const createInitialTab = (id: string = 'tab-1', basicInfo?: BasicInfo): TabData => {
@@ -472,12 +536,17 @@ export const App: React.FC = () => {
         if (t.id !== activeTabId) return t;
 
         const currentMode = t.lines[t.currentLineIndex]?.selection.mode || t.basicInfo.surveyType;
-        const initialFloor =
-          currentMode === '内部'
-            ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
-            : undefined;
+        const isInternal = currentMode === '内部';
 
-        const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor);
+        const initialFloor = isInternal
+          ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
+          : undefined;
+
+        const initialLocation = isInternal
+          ? getPreviousInternalLocation(t.lines, t.currentLineIndex, t.basicInfo.surveyType, internalCustomButtons)
+          : undefined;
+
+        const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor, initialLocation);
         const updatedLines = [...t.lines];
         const insertIndex = t.currentLineIndex + 1;
         updatedLines.splice(insertIndex, 0, newLine);
@@ -576,12 +645,17 @@ export const App: React.FC = () => {
         const isLastLine = t.currentLineIndex === t.lines.length - 1;
         if (isLastLine) {
           const currentMode = t.lines[t.currentLineIndex]?.selection.mode || t.basicInfo.surveyType;
-          const initialFloor =
-            currentMode === '内部'
-              ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
-              : undefined;
+          const isInternal = currentMode === '内部';
 
-          const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor);
+          const initialFloor = isInternal
+            ? getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType)
+            : undefined;
+
+          const initialLocation = isInternal
+            ? getPreviousInternalLocation(t.lines, t.currentLineIndex, t.basicInfo.surveyType, internalCustomButtons)
+            : undefined;
+
+          const newLine = createInitialLine(t.basicInfo.surveyType, initialFloor, initialLocation);
           return {
             ...t,
             lines: [...t.lines, newLine],
@@ -592,22 +666,38 @@ export const App: React.FC = () => {
           const nextLine = t.lines[nextIndex];
           const nextMode = nextLine?.selection.mode || t.basicInfo.surveyType;
 
-          // 内部モードで、かつ進み先の行が完全に未入力で階数が0の場合、前ページの階数を初期値として適用
-          if (
+          // 内部モードで、かつ進み先の行が完全に未入力の場合、前ページの階数・場所を初期値として適用
+          const isNextLineEmpty =
             nextMode === '内部' &&
             nextLine &&
             (nextLine.selection.location?.floor1 === 0 || !nextLine.selection.location?.floor1) &&
             (nextLine.selection.location?.floor2 === 0 || !nextLine.selection.location?.floor2) &&
             !nextLine.selection.location?.selectedLocation &&
+            !nextLine.selection.location?.isBuilding &&
+            (!nextLine.selection.internalSelections || nextLine.selection.internalSelections.length === 0) &&
             (!nextLine.selection.directions || nextLine.selection.directions.length === 0) &&
             !nextLine.selection.part &&
             (!nextLine.selection.damages || nextLine.selection.damages.length === 0) &&
             !nextLine.selection.situationButton &&
             !nextLine.selection.situationText &&
-            !nextLine.selection.memo
-          ) {
+            !nextLine.selection.memo;
+
+          if (isNextLineEmpty) {
             const initialFloor = getPreviousInternalFloor(t.lines, t.currentLineIndex, t.basicInfo.surveyType);
-            if (initialFloor.floor1 > 0 || initialFloor.floor2 > 0) {
+            const initialLocation = getPreviousInternalLocation(
+              t.lines,
+              t.currentLineIndex,
+              t.basicInfo.surveyType,
+              internalCustomButtons
+            );
+
+            const hasFloor = initialFloor.floor1 > 0 || initialFloor.floor2 > 0;
+            const hasLocation =
+              !!initialLocation.selectedLocation ||
+              initialLocation.isBuilding ||
+              (initialLocation.internalLocationSelections && initialLocation.internalLocationSelections.length > 0);
+
+            if (hasFloor || hasLocation) {
               const updatedLines = [...t.lines];
               updatedLines[nextIndex] = {
                 ...nextLine,
@@ -615,9 +705,15 @@ export const App: React.FC = () => {
                   ...nextLine.selection,
                   location: {
                     ...nextLine.selection.location,
-                    floor1: initialFloor.floor1,
-                    floor2: initialFloor.floor2,
+                    floor1: hasFloor ? initialFloor.floor1 : (nextLine.selection.location?.floor1 ?? 0),
+                    floor2: hasFloor ? initialFloor.floor2 : (nextLine.selection.location?.floor2 ?? 0),
+                    selectedLocation: initialLocation.selectedLocation,
+                    isBuilding: initialLocation.isBuilding,
                   },
+                  internalSelections: [
+                    ...(nextLine.selection.internalSelections || []),
+                    ...(initialLocation.internalLocationSelections || []),
+                  ],
                 },
               };
               return {

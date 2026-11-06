@@ -186,7 +186,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
-  // ② 方向グループハンドラー（最大2つ選択）
+  // ② 方向グループハンドラー（最大2つ選択、対向する「北・南」「西・東」は後から選択した方のみ有効）
   const handleDirectionToggle = (dir: string) => {
     const current = selection.directions;
     let next: string[];
@@ -194,10 +194,20 @@ export const MainArea: React.FC<MainAreaProps> = ({
     if (current.includes(dir)) {
       next = current.filter((d) => d !== dir);
     } else {
-      if (current.length >= 2) {
-        next = [current[1], dir];
+      // 対向する方位（北⇔南、西⇔東）がある場合、対向する方を解除して後から選択した方を有効にする
+      const oppositeMap: Record<string, string> = {
+        '北': '南',
+        '南': '北',
+        '西': '東',
+        '東': '西',
+      };
+      const oppositeDir = oppositeMap[dir];
+      const filtered = oppositeDir ? current.filter((d) => d !== oppositeDir) : current;
+
+      if (filtered.length >= 2) {
+        next = [filtered[filtered.length - 1], dir];
       } else {
-        next = [...current, dir];
+        next = [...filtered, dir];
       }
     }
 
@@ -598,7 +608,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
   // 選択中の場所（固定場所またはカスタム場所の名称）
   const selectedLocationName = useMemo(() => {
     if (activeLocation) return activeLocation;
-    const customLocBtns = internalCustomButtons.filter(
+    const customLocBtns = displayedCustomButtons.filter(
       (b) => b.category === '場所' && !b.isVoice && b.name !== '音声入力'
     );
     const sel = (currentCustomSelections || []).find((item) => {
@@ -609,18 +619,18 @@ export const MainArea: React.FC<MainAreaProps> = ({
       return sel.replace(/[①-⑳]$/, '');
     }
     return null;
-  }, [activeLocation, internalCustomButtons, currentCustomSelections]);
+  }, [activeLocation, displayedCustomButtons, currentCustomSelections]);
 
   // 現在選択中の場所が属する五十音行
   const currentSelectedInternalLocationKana = useMemo(() => {
     if (!selectedLocationName) return null;
-    const btn = internalCustomButtons.find(
+    const btn = displayedCustomButtons.find(
       (b) => b.name === selectedLocationName && b.category === '場所'
     );
     return btn?.kanaGroup || detectKanaGroup(selectedLocationName);
-  }, [selectedLocationName, internalCustomButtons]);
+  }, [selectedLocationName, displayedCustomButtons]);
 
-  // 内部モードの場所グループ用アクティブ五十音行
+  // 内部モード・傾斜モードの場所グループ用アクティブ五十音行
   const [activeInternalKanaGroup, setActiveInternalKanaGroup] = useState<KanaGroup>(() => {
     return currentSelectedInternalLocationKana || 'あ';
   });
@@ -1365,7 +1375,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
       kanaGroup: detectedKana,
     };
     onChangeCustomButtons([...customButtons, newBtn]);
-    if (isModeInternal && newButtonCategory === '場所' && detectedKana) {
+    if ((isModeInternal || isModeInclination) && newButtonCategory === '場所' && detectedKana) {
       setActiveInternalKanaGroup(detectedKana);
     }
     setNewButtonName('');
@@ -1510,23 +1520,61 @@ export const MainArea: React.FC<MainAreaProps> = ({
     }
   };
 
-  // 内部モードの場所ボタンを行グループへドロップした際の行所属変更ハンドラー
+  // 内部モード・傾斜モードの場所ボタンを行グループへドロップした際の行所属変更ハンドラー
   const handleDropButtonToKanaGroup = (btnKeyOrName: string, targetKana: KanaGroup) => {
-    const targetBtn = internalCustomButtons.find(
+    if (isModeInclination) {
+      const incTarget = inclinationCustomButtons.find(
+        (b) =>
+          b.category === '場所' &&
+          (b.name === btnKeyOrName || b.id === btnKeyOrName || `custom:${b.id}` === btnKeyOrName)
+      );
+      if (incTarget) {
+        const updated = inclinationCustomButtons.map((b) => {
+          if (b.id === incTarget.id) {
+            return { ...b, kanaGroup: targetKana };
+          }
+          return b;
+        });
+        onChangeInclinationCustomButtons(updated);
+        setActiveInternalKanaGroup(targetKana);
+        return;
+      }
+    }
+
+    const intTarget = internalCustomButtons.find(
       (b) =>
         b.category === '場所' &&
         (b.name === btnKeyOrName || b.id === btnKeyOrName || `custom:${b.id}` === btnKeyOrName)
     );
 
-    if (targetBtn) {
+    if (intTarget) {
       const updated = internalCustomButtons.map((b) => {
-        if (b.id === targetBtn.id) {
+        if (b.id === intTarget.id) {
           return { ...b, kanaGroup: targetKana };
         }
         return b;
       });
       onChangeInternalCustomButtons(updated);
       setActiveInternalKanaGroup(targetKana);
+      return;
+    }
+
+    const extTarget = externalCustomButtons.find(
+      (b) =>
+        b.category === '場所' &&
+        (b.name === btnKeyOrName || b.id === btnKeyOrName || `custom:${b.id}` === btnKeyOrName)
+    );
+
+    if (extTarget) {
+      const updated = externalCustomButtons.map((b) => {
+        if (b.id === extTarget.id) {
+          return { ...b, kanaGroup: targetKana };
+        }
+        return b;
+      });
+      onChangeExternalCustomButtons(updated);
+      setActiveInternalKanaGroup(targetKana);
+      return;
     }
   };
 
@@ -3306,6 +3354,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         >
                           {btnConfig.category} (切替)
                         </button>
+
                         {btnConfig.category === '場所' && (
                           <span
                             style={{
@@ -3458,15 +3507,137 @@ export const MainArea: React.FC<MainAreaProps> = ({
                 marginBottom: '8px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
+                justifyContent: 'space-between',
               }}
             >
-              <MapPin size={18} />
-              ② 場所グループ
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={18} />
+                ② 場所グループ
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#6b7280', fontWeight: 'normal' }}>
+                ドラッグで行移動
+              </div>
             </div>
 
-            {/* 場所ボタン */}
-            {renderUnifiedCategoryButtons('場所', DEFAULT_LOCATION_OPTIONS, locationOptions, 'location', { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' }, 'repeat(6, 1fr)')}
+            {/* 五十音行ボタン（あ、か、さ、た、な、は、ま、や、ら、わ、A） */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(11, 1fr)',
+                gap: '2px',
+                marginBottom: '8px',
+                backgroundColor: '#f3f4f6',
+                padding: '3px',
+                borderRadius: '6px',
+              }}
+            >
+              {KANA_GROUPS.map((kana) => {
+                const isActive = activeInternalKanaGroup === kana;
+                const isDragOver = dragOverKana === kana;
+                const hasSelected = currentSelectedInternalLocationKana === kana;
+
+                return (
+                  <button
+                    key={kana}
+                    type="button"
+                    data-drag-kana-target={kana}
+                    onClick={() => {
+                      if (suppressClickRef.current) return;
+                      setActiveInternalKanaGroup(kana);
+                    }}
+                    onDragOver={(e) => {
+                      if (draggedItem?.type === 'location') {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverKana(kana);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverKana === kana) setDragOverKana(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (draggedItem?.type === 'location') {
+                        handleDropButtonToKanaGroup(draggedItem.key, kana);
+                      }
+                      setDragOverKana(null);
+                      setDraggedItem(null);
+                    }}
+                    style={{
+                      position: 'relative',
+                      height: '34px',
+                      padding: '0',
+                      fontSize: '0.9rem',
+                      fontWeight: isActive ? 'bold' : '600',
+                      borderRadius: '4px',
+                      border: isDragOver
+                        ? '2px dashed #2563eb'
+                        : isActive
+                        ? '1px solid #2563eb'
+                        : '1px solid #d1d5db',
+                      backgroundColor: isDragOver
+                        ? '#dbeafe'
+                        : isActive
+                        ? '#2563eb'
+                        : '#ffffff',
+                      color: isActive ? '#ffffff' : '#374151',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isActive ? '0 1px 3px rgba(37,99,235,0.3)' : 'none',
+                    }}
+                  >
+                    {kana}
+                    {/* 選択中の部屋がある場合のインジケーター（点） */}
+                    {hasSelected && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          width: '5px',
+                          height: '5px',
+                          borderRadius: '50%',
+                          backgroundColor: isActive ? '#fef08a' : '#2563eb',
+                        }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 選択された行の場所ボタン */}
+            {renderUnifiedCategoryButtons(
+              '場所',
+              DEFAULT_LOCATION_OPTIONS,
+              locationOptions,
+              'location',
+              { height: '48px', fontSize: '0.95rem', padding: '4px', fontWeight: 'bold' },
+              'repeat(auto-fill, minmax(75px, 1fr))',
+              false,
+              activeInternalKanaGroup
+            ) || (
+              <div
+                style={{
+                  padding: '14px 8px',
+                  textAlign: 'center',
+                  fontSize: '0.82rem',
+                  color: '#9ca3af',
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '6px',
+                  border: '1px dashed #e5e7eb',
+                  marginTop: '6px',
+                }}
+              >
+                「{activeInternalKanaGroup}」行の部屋ボタンはありません
+                <div style={{ fontSize: '0.72rem', color: '#b0b7c3', marginTop: '2px' }}>
+                  他の部屋ボタンを「{activeInternalKanaGroup}」へドラッグして移動できます
+                </div>
+              </div>
+            )}
           </section>
 
           {/* ③ 傾斜用 方向グループ */}
@@ -4024,6 +4195,21 @@ export const MainArea: React.FC<MainAreaProps> = ({
                         >
                           {btnConfig.category} (切替)
                         </button>
+
+                        {btnConfig.category === '場所' && (
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              color: '#2563eb',
+                              backgroundColor: '#eff6ff',
+                              padding: '1px 5px',
+                              borderRadius: '3px',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {btnConfig.kanaGroup || detectKanaGroup(btnConfig.name)}行
+                          </span>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

@@ -2,8 +2,8 @@ import { LineSelection, LineData, SurveyType, CustomButtonConfig, DamageItem, Ba
 
 /**
  * 基本情報設定のヘッダー文字列を生成
- * 仕様: 家屋番号(2桁数字のみ) ＋ 調査員名 ＋ 調査日付 ＋ 調査種別 ＋ 調査番号 ＋ フォルダ番号
- * 例: 01 畦地 2026-09-27 外部 ① #100
+ * 仕様: 家屋番号(2桁数字のみ) ＋ 調査員名 ＋ フォルダ番号 ＋ 調査種別 ＋ 調査番号 ＋ 調査日付
+ * 例: 01 畦地 #100 外部 ① 2026-09-27
  */
 export function formatBasicInfoHeader(basicInfo?: BasicInfo): string {
   if (!basicInfo) return '';
@@ -14,7 +14,7 @@ export function formatBasicInfoHeader(basicInfo?: BasicInfo): string {
   const surveyNum = basicInfo.surveyNumber || '';
   const folderNum = basicInfo.folderNumber ? `#${basicInfo.folderNumber}` : '';
 
-  return [houseStr, investigator, surveyDate, surveyType, surveyNum, folderNum].filter(Boolean).join(' ');
+  return [houseStr, investigator, folderNum, surveyType, surveyNum, surveyDate].filter(Boolean).join(' ');
 }
 
 /**

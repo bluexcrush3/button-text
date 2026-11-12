@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { LineData, BasicInfo } from '../types';
-import { generateLineText, generateAllLinesTextForSpreadsheet, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
+import { generateLineText, generateAllLinesTextForSpreadsheet, generateAllLinesTextForSpreadsheetOptimized, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
 import { FileText, Copy, Check, X, WrapText } from 'lucide-react';
-import { CopyFormatModal } from './CopyFormatModal';
+import { CopyFormatModal, CopyFormatType } from './CopyFormatModal';
 
 interface AllTextModalProps {
   isOpen: boolean;
@@ -38,26 +38,37 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
   const fullText = lineTexts.filter((t) => t.trim().length > 0).join('\n');
 
   const handleSelectFormatAndCopy = async (
-    delimiter: '\t' | ';',
+    delimiter: CopyFormatType,
     copyOptions: CopyNumberOptions
   ) => {
     try {
       setCopyStartNo(copyOptions.startNo);
       setCopyStartInclination(copyOptions.startInclination);
 
-      const headerLine = formatBasicInfoHeader(basicInfo);
       const validLines = lines.filter((line) => hasLineInput(line.selection, customButtons));
-      const lineTextsForCopy = generateAllLinesTextForSpreadsheet(
-        validLines,
-        customButtons,
-        delimiter,
-        copyOptions,
-        basicInfo?.surveyType
-      );
 
-      const copyText = headerLine
-        ? (lineTextsForCopy.length > 0 ? [headerLine, ...lineTextsForCopy].join('\n') : headerLine)
-        : lineTextsForCopy.join('\n');
+      let copyText = '';
+      if (delimiter === 'spreadsheet_optimized') {
+        copyText = generateAllLinesTextForSpreadsheetOptimized(
+          validLines,
+          customButtons,
+          basicInfo,
+          basicInfo?.surveyType
+        );
+      } else {
+        const headerLine = formatBasicInfoHeader(basicInfo);
+        const lineTextsForCopy = generateAllLinesTextForSpreadsheet(
+          validLines,
+          customButtons,
+          delimiter,
+          copyOptions,
+          basicInfo?.surveyType
+        );
+
+        copyText = headerLine
+          ? (lineTextsForCopy.length > 0 ? [headerLine, ...lineTextsForCopy].join('\n') : headerLine)
+          : lineTextsForCopy.join('\n');
+      }
 
       await navigator.clipboard.writeText(copyText);
       setCopied(true);

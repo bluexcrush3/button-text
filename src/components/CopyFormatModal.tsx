@@ -4,10 +4,12 @@ import { CopyNumberOptions } from '../utils/textGenerator';
 
 export const ALPHABET_OPTIONS = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
 
+export type CopyFormatType = '\t' | ';' | 'spreadsheet_optimized';
+
 interface CopyFormatModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSelectFormat: (delimiter: '\t' | ';', options: CopyNumberOptions) => void;
+    onSelectFormat: (format: CopyFormatType, options: CopyNumberOptions) => void;
     initialStartNo?: number;
     initialStartInclination?: string;
 }
@@ -31,9 +33,9 @@ export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
 
     if (!isOpen) return null;
 
-    const handleSelect = (delimiter: '\t' | ';') => {
+    const handleSelect = (format: CopyFormatType) => {
         const parsedNo = Math.max(1, parseInt(startNo, 10) || 1);
-        onSelectFormat(delimiter, {
+        onSelectFormat(format, {
             startNo: parsedNo,
             startInclination: startInclination || 'A',
         });
@@ -191,6 +193,31 @@ export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
                             <span>セミコロン（ ; ）区切り</span>
                             <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#666' }}>
                                 （テキストデータ・CSV用途）
+                            </span>
+                        </button>
+
+                        <button
+                            type="button"
+                            className="btn"
+                            onClick={() => handleSelect('spreadsheet_optimized')}
+                            style={{
+                                padding: '12px 14px',
+                                fontSize: '0.95rem',
+                                fontWeight: 'bold',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                gap: '2px',
+                                textAlign: 'left',
+                                width: '100%',
+                                backgroundColor: '#f0fdf4',
+                                borderColor: '#86efac',
+                                color: '#166534',
+                            }}
+                        >
+                            <span>スプシ最適化</span>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 'normal', color: '#15803d' }}>
+                                （独自正規化ルール・セミコロン区切り）
                             </span>
                         </button>
                     </div>

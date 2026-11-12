@@ -662,3 +662,254 @@ export function generateAllLinesTextForSpreadsheet(
     );
   });
 }
+
+/**
+ * 傾斜モードの数値・方位情報の抽出ヘルパー
+ */
+function getInclinationValueInfo(item?: DamageItem): { hasValue: boolean; direction: string; valueStr: string } {
+  if (!item) {
+    return { hasValue: false, direction: '', valueStr: '' };
+  }
+
+  const dirs = item.directions || [];
+  const isSouthNorthBoth = dirs.includes('南') && dirs.includes('北');
+  const isEastWestBoth = dirs.includes('東') && dirs.includes('西');
+  const isBoth = isSouthNorthBoth || isEastWestBoth;
+
+  const val = item.valueW ?? item.value ?? 0;
+  const hasDirection = dirs.length > 0;
+
+  // 方向選択または数値入力がある場合に有効と判定
+  const hasValue = isBoth || hasDirection || val !== 0;
+
+  if (!hasValue) {
+    return { hasValue: false, direction: '', valueStr: '' };
+  }
+
+  // 方位
+  const direction = dirs.join('');
+
+  // 数値（※数値のみ ㎜/Mは付けない）
+  let valueStr = '';
+  if (isBoth) {
+    valueStr = '0.0';
+  } else if (val !== 0) {
+    const isLessThan = item.isLessThan ? '<' : '';
+    valueStr = `${isLessThan}${formatDamageValue(val)}`;
+  } else if (hasDirection) {
+    valueStr = '0.0';
+  }
+
+  return { hasValue, direction, valueStr };
+}
+
+/**
+ * 内部・外部モードの損傷数値・プリセット抽出ヘルパー
+ */
+function getDamageValuesForSpreadsheet(item?: DamageItem): {
+  name: string;
+  valueW: string;
+  valueL: string;
+  preset: string;
+} {
+  if (!item) {
+    return { name: '', valueW: '', valueL: '', preset: '' };
+  }
+
+  const name = item.name || '';
+  const wVal = item.valueW ?? item.value ?? 0;
+  const lVal = item.valueL ?? 0;
+  const hasL = Boolean(item.hasL || lVal > 0);
+
+  let valueW = '';
+  if (wVal > 0) {
+    const wPrefix = item.isLessThan ? '<' : '';
+    valueW = `${wPrefix}${formatDamageValue(wVal)}`;
+  }
+
+  let valueL = '';
+  if (lVal > 0) {
+    valueL = formatDamageValue(lVal);
+  } else if (hasL) {
+    valueL = '全長';
+  }
+
+  const preset = item.preset || '';
+
+  return { name, valueW, valueL, preset };
+}
+
+/**
+ * 1行分のデータを「スプシ最適化」ルールに基づいて文字列化する
+ */
+export function generateLineTextForSpreadsheetOptimized(
+  selection: LineSelection,
+  customButtonsInput: CustomButtonsInput = [],
+  basicInfo?: BasicInfo,
+  fullText?: string,
+  defaultSurveyType?: SurveyType
+): string {
+  const comp = getLineComponents(selection, customButtonsInput);
+  const lineFullText = fullText ?? generateLineText(selection, customButtonsInput);
+
+  const isInclination = selection.mode === '傾斜' || (!selection.mode && defaultSurveyType === '傾斜');
+
+  if (isInclination) {
+    const items = (selection.inclinationValues && selection.inclinationValues.length > 0)
+      ? selection.inclinationValues
+      : (selection.damages || []);
+
+    const info1 = getInclinationValueInfo(items[0]);
+    const info2 = getInclinationValueInfo(items[1]);
+
+    // 2行目の数値と方位の優先判定
+    let line2Dir = '';
+    let line2Val = '';
+    if (info1.hasValue) {
+      line2Dir = info1.direction;
+      line2Val = info1.valueStr;
+    } else if (info2.hasValue) {
+      line2Dir = info2.direction;
+      line2Val = info2.valueStr;
+    }
+
+    // 3行目の数値と方位の優先判定（両方入力時のみ数値2を出力）
+    let line3Dir = '';
+    let line3Val = '';
+    if (info1.hasValue && info2.hasValue) {
+      line3Dir = info2.direction;
+      line3Val = info2.valueStr;
+    }
+
+    const line1 = [
+      lineFullText,
+      '',
+      comp.location || '',
+      comp.floor || '',
+      comp.direction || '',
+      comp.part || '',
+    ].join(';');
+
+    const line2 = [
+      lineFullText,
+      '',
+      comp.location || '',
+      comp.floor || '',
+      line2Dir,
+      '',
+      '',
+      line2Val,
+    ].join(';');
+
+    const line3 = [
+      lineFullText,
+      '',
+      comp.location || '',
+      comp.floor || '',
+      line3Dir,
+      '',
+      '',
+      line3Val,
+    ].join(';');
+
+    return `${line1}\n${line2}\n${line3}`;
+  }
+
+  // 内部・外部モード
+  const items = comp.damageItems || [];
+  const parsed1 = items[0] ? parseDamageName(items[0].name || '') : { prefix: '', baseName: '' };
+  const parsed2 = items[1] ? parseDamageName(items[1].name || '') : { prefix: '', baseName: '' };
+
+  const isSameBase = Boolean(parsed1.baseName && parsed1.baseName === parsed2.baseName);
+  const isLeftRight = isSameBase && (
+    (parsed1.prefix === '右' && parsed2.prefix === '左') ||
+    (parsed1.prefix === '左' && parsed2.prefix === '右')
+  );
+  const isUpDown = isSameBase && (
+    (parsed1.prefix === '上' && parsed2.prefix === '下') ||
+    (parsed1.prefix === '下' && parsed2.prefix === '上')
+  );
+
+  let targetItem1 = items[0];
+  let targetItem2 = items[1];
+  let dmg1Name = '';
+  let dmg2Name = '';
+
+  if (isLeftRight) {
+    // 「左右」設定時：数値1と数値2を逆にする
+    // 第8・9列に数値2（左）の値、第12・13列に損傷1（右）の値
+    targetItem1 = parsed1.prefix === '左' ? items[0] : items[1];
+    targetItem2 = parsed1.prefix === '右' ? items[0] : items[1];
+    dmg1Name = parsed1.baseName;
+    dmg2Name = '右';
+  } else if (isUpDown) {
+    targetItem1 = parsed1.prefix === '上' ? items[0] : items[1];
+    targetItem2 = parsed1.prefix === '下' ? items[0] : items[1];
+    dmg1Name = parsed1.baseName;
+    dmg2Name = '下';
+  } else {
+    dmg1Name = items[0]?.name ? parseDamageName(items[0].name).baseName : '';
+    dmg2Name = items[1]?.name ? parseDamageName(items[1].name).baseName : '';
+
+    // 「現況」「全景」ボタン（situationButton）の反映
+    const sitBtn = selection.situationButton || null;
+    if (sitBtn) {
+      if (!dmg1Name) {
+        dmg1Name = sitBtn;
+      } else if (!dmg2Name) {
+        dmg2Name = sitBtn;
+      }
+    }
+  }
+
+  const dmg1 = getDamageValuesForSpreadsheet(targetItem1);
+  const dmg2 = getDamageValuesForSpreadsheet(targetItem2);
+
+  const sitText = (selection.situationText && selection.situationText.trim()) || '';
+
+  const cols = [
+    lineFullText,                 // 第1列: 該当ページの生成文字列(全文)
+    '',                           // 第2列: (空欄)
+    comp.location || '',          // 第3列: 場所
+    comp.floor || '',             // 第4列: 階数
+    comp.direction || '',         // 第5列: 方位
+    comp.part || '',              // 第6列: 部位
+    dmg1Name,                     // 第7列: 損傷1(損傷名のみ) ※左右・上下設定時はベース損傷名
+    dmg1.valueW,                  // 第8列: 損傷1W数値
+    dmg1.valueL,                  // 第9列: 損傷1L数値
+    dmg1.preset,                  // 第10列: 損傷1プリセット
+    dmg2Name,                     // 第11列: 損傷2(損傷名のみ) ※左右・上下時は「右」または「下」
+    dmg2.valueW,                  // 第12列: 損傷2W数値
+    dmg2.valueL,                  // 第13列: 損傷2L数値
+    dmg2.preset,                  // 第14列: 損傷2プリセット
+    sitText,                      // 第15列: 状況テキスト（自由入力テキストのみ）
+  ];
+
+  return cols.join(';');
+}
+
+/**
+ * 有効な全行データを「スプシ最適化」ルールに基づいて文字列結合して生成
+ */
+export function generateAllLinesTextForSpreadsheetOptimized(
+  validLines: LineData[],
+  customButtonsInput: CustomButtonsInput = [],
+  basicInfo?: BasicInfo,
+  defaultSurveyType?: SurveyType
+): string {
+  const headerLine = formatBasicInfoHeader(basicInfo);
+  const lineTexts = validLines.map((line) => {
+    return generateLineTextForSpreadsheetOptimized(
+      line.selection,
+      customButtonsInput,
+      basicInfo,
+      undefined,
+      defaultSurveyType
+    );
+  });
+
+  if (headerLine) {
+    return lineTexts.length > 0 ? [headerLine, ...lineTexts].join('\n') : headerLine;
+  }
+  return lineTexts.join('\n');
+}

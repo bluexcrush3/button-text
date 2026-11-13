@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   isDanger?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  onClose?: () => void;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -21,11 +22,12 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isDanger = false,
   onConfirm,
   onCancel,
+  onClose,
 }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay" onClick={onClose ?? onCancel}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isDanger ? '#dc3545' : 'inherit' }}>

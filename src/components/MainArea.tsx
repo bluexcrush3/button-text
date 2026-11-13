@@ -162,28 +162,41 @@ export const MainArea: React.FC<MainAreaProps> = ({
     });
   };
 
-  const handleFloor1Change = (delta: number) => {
+  const handleFloor1Set = (rawVal: number) => {
     if (isFloorDisabled) return;
-    const newVal = Math.max(0, selection.location.floor1 + delta);
+    const newVal = Math.max(0, rawVal);
+    const isInc = (selection.mode || '外部') === '傾斜';
+    const nextFloor2 = isInc ? 0 : Math.max(selection.location.floor2, newVal);
     onChangeSelection({
       ...selection,
       location: {
         ...selection.location,
         floor1: newVal,
+        floor2: nextFloor2,
       },
     });
   };
 
-  const handleFloor2Change = (delta: number) => {
+  const handleFloor2Set = (rawVal: number) => {
     if (isFloorDisabled) return;
-    const newVal = Math.max(0, selection.location.floor2 + delta);
+    const newVal = Math.max(0, rawVal);
+    const nextFloor1 = Math.min(selection.location.floor1, newVal);
     onChangeSelection({
       ...selection,
       location: {
         ...selection.location,
+        floor1: nextFloor1,
         floor2: newVal,
       },
     });
+  };
+
+  const handleFloor1Change = (delta: number) => {
+    handleFloor1Set(selection.location.floor1 + delta);
+  };
+
+  const handleFloor2Change = (delta: number) => {
+    handleFloor2Set(selection.location.floor2 + delta);
   };
 
   // ② 方向グループハンドラー（最大2つ選択、対向する「北・南」「西・東」は後から選択した方のみ有効）
@@ -2450,12 +2463,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isFloorDisabled) {
-                        onChangeSelection({
-                          ...selection,
-                          location: { ...selection.location, floor1: val },
-                        });
-                      }
+                      handleFloor1Set(val);
                     }}
                     disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
@@ -2492,12 +2500,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isFloorDisabled) {
-                        onChangeSelection({
-                          ...selection,
-                          location: { ...selection.location, floor2: val },
-                        });
-                      }
+                      handleFloor2Set(val);
                     }}
                     disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
@@ -3464,12 +3467,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isFloorDisabled) {
-                        onChangeSelection({
-                          ...selection,
-                          location: { ...selection.location, floor1: val },
-                        });
-                      }
+                      handleFloor1Set(val);
                     }}
                     disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '1rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
@@ -4310,12 +4308,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isFloorDisabled) {
-                        onChangeSelection({
-                          ...selection,
-                          location: { ...selection.location, floor1: val },
-                        });
-                      }
+                      handleFloor1Set(val);
                     }}
                     disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}
@@ -4352,12 +4345,7 @@ export const MainArea: React.FC<MainAreaProps> = ({
                     placeholder="0"
                     onChange={(e) => {
                       const val = Math.max(0, parseInt(e.target.value) || 0);
-                      if (!isFloorDisabled) {
-                        onChangeSelection({
-                          ...selection,
-                          location: { ...selection.location, floor2: val },
-                        });
-                      }
+                      handleFloor2Set(val);
                     }}
                     disabled={isFloorDisabled}
                     style={{ height: '38px', fontSize: '0.95rem', minWidth: 0, padding: '0 4px', textAlign: 'center' }}

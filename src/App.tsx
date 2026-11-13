@@ -387,7 +387,7 @@ export const App: React.FC = () => {
         surveyType: '外部',
         surveyNumber: '',
         surveyDate: getTodayDateString(),
-        investigator: '畦地',
+        investigator: activeTab?.basicInfo.investigator || '畦地',
         folderNumber: 100,
       };
     }
@@ -811,6 +811,7 @@ export const App: React.FC = () => {
         cancelText="新規作成"
         onConfirm={() => handleAddTab(true)}
         onCancel={() => handleAddTab(false)}
+        onClose={() => setIsAddTabModalOpen(false)}
       />
 
       {/* モーダル: 全削除確認 */}

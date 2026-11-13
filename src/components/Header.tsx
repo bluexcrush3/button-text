@@ -60,11 +60,24 @@ export const Header: React.FC<HeaderProps> = ({
   const currentLineNum = (activeTab?.currentLineIndex || 0) + 1;
   const currentMode = currentSelection?.mode || activeTab?.basicInfo.surveyType || '外部';
 
+  const tabListRef = React.useRef<HTMLDivElement>(null);
+  const prevTabCountRef = React.useRef<number>(tabs.length);
+
+  React.useEffect(() => {
+    if (tabs.length > prevTabCountRef.current && tabListRef.current) {
+      const el = tabListRef.current;
+      requestAnimationFrame(() => {
+        el.scrollLeft = el.scrollWidth;
+      });
+    }
+    prevTabCountRef.current = tabs.length;
+  }, [tabs.length]);
+
   return (
     <header className="sticky-header">
       {/* 1行目: タブエリア (左右スクロール) & 基本情報 & 全削除ボタン */}
       <div className="header-row-1">
-        <div className="tab-list-container">
+        <div className="tab-list-container" ref={tabListRef}>
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             const tabInfo = getTabNameInfo(tab, tabs);

@@ -898,9 +898,27 @@ export function generateAllLinesTextForSpreadsheetOptimized(
   defaultSurveyType?: SurveyType
 ): string {
   const headerLine = formatBasicInfoHeader(basicInfo);
-  const lineTexts = validLines.map((line) => {
+  const lineTexts = validLines.map((line, index) => {
+    const currentSit = (line.selection.situationText || '').trim();
+    const prevSit = index > 0 ? (validLines[index - 1].selection.situationText || '').trim() : '';
+    const nextSit = index < validLines.length - 1 ? (validLines[index + 1].selection.situationText || '').trim() : '';
+
+    let targetSelection = line.selection;
+    if (
+      currentSit &&
+      prevSit !== currentSit &&
+      nextSit !== currentSit &&
+      !currentSit.endsWith('（1枚）') &&
+      !currentSit.endsWith('(1枚)')
+    ) {
+      targetSelection = {
+        ...line.selection,
+        situationText: `${currentSit}（1枚）`,
+      };
+    }
+
     return generateLineTextForSpreadsheetOptimized(
-      line.selection,
+      targetSelection,
       customButtonsInput,
       basicInfo,
       undefined,

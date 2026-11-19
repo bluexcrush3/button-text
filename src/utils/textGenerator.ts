@@ -561,8 +561,8 @@ export function generateLineTextForSpreadsheet(
       const damage1Text = parsed1.baseName;
       const damage2Text = parsed2.baseName;
 
-      col4 = valDetail1 ? `${damage1Text}　${valDetail1}` : '';
-      col5 = valDetail2 ? `${damage2Text}　${valDetail2}` : '';
+      col4 = valDetail1 ? `${damage1Text}${valDetail1}` : '';
+      col5 = valDetail2 ? `${damage2Text}${valDetail2}` : '';
 
       const allDamageNameStr = baseNames.join('・');
       const damagePartText = sitBtn ? `${allDamageNameStr}・${sitBtn}` : allDamageNameStr;

@@ -618,6 +618,71 @@ export function hasLineInput(
 export interface CopyNumberOptions {
   startNo: number;
   startInclination: string;
+  insertGenkyo?: boolean;
+  insertAllGenba?: boolean;
+}
+
+/**
+ * 状況グループが未入力の全ての行に対して「現場より撮影」を設定した行配列を返す
+ * ※損傷グループに「全景」が入力されている行は対象外
+ */
+export function applyGenbaToEmptySituationLines(lines: LineData[]): LineData[] {
+  return lines.map((line) => {
+    const isZenkei =
+      line.selection.situationButton === '全景' ||
+      (line.selection.damages || []).some((d) => d.name === '全景') ||
+      (line.selection.internalSelections || []).includes('全景') ||
+      (line.selection.externalSelections || []).includes('全景') ||
+      (line.selection.voiceItems || []).some((v) => v.category === '損傷' && v.text?.trim() === '全景');
+
+    if (isZenkei) {
+      return line;
+    }
+
+    const hasSituation = Boolean(line.selection.situationText && line.selection.situationText.trim());
+    if (!hasSituation) {
+      return {
+        ...line,
+        selection: {
+          ...line.selection,
+          situationText: '現場より撮影',
+        },
+      };
+    }
+    return line;
+  });
+}
+
+/**
+ * 損傷グループが未入力の全ての行に対して「現況」を設定した行配列を返す（傾斜モードは対象外）
+ */
+export function applyGenkyoToEmptyDamageLines(
+  lines: LineData[],
+  customButtonsInput: CustomButtonsInput = [],
+  defaultSurveyType?: SurveyType
+): LineData[] {
+  return lines.map((line) => {
+    const isInc =
+      line.selection.mode === '傾斜' ||
+      (!line.selection.mode && defaultSurveyType === '傾斜');
+    if (isInc) return line;
+
+    const comp = getLineComponents(line.selection, customButtonsInput);
+    const hasDamage =
+      (comp.damageItems && comp.damageItems.length > 0) ||
+      Boolean(line.selection.situationButton);
+
+    if (!hasDamage) {
+      return {
+        ...line,
+        selection: {
+          ...line.selection,
+          situationButton: '現況',
+        },
+      };
+    }
+    return line;
+  });
 }
 
 /**

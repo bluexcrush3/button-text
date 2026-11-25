@@ -12,6 +12,8 @@ interface CopyFormatModalProps {
     onSelectFormat: (format: CopyFormatType, options: CopyNumberOptions) => void;
     initialStartNo?: number;
     initialStartInclination?: string;
+    initialInsertGenkyo?: boolean;
+    initialInsertAllGenba?: boolean;
 }
 
 export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
@@ -20,16 +22,22 @@ export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
     onSelectFormat,
     initialStartNo = 1,
     initialStartInclination = 'A',
+    initialInsertGenkyo = false,
+    initialInsertAllGenba = false,
 }) => {
     const [startNo, setStartNo] = useState<string>(String(initialStartNo));
     const [startInclination, setStartInclination] = useState<string>(initialStartInclination);
+    const [insertGenkyo, setInsertGenkyo] = useState<boolean>(initialInsertGenkyo);
+    const [insertAllGenba, setInsertAllGenba] = useState<boolean>(initialInsertAllGenba);
 
     useEffect(() => {
         if (isOpen) {
             setStartNo(String(initialStartNo));
             setStartInclination(initialStartInclination);
+            setInsertGenkyo(initialInsertGenkyo);
+            setInsertAllGenba(initialInsertAllGenba);
         }
-    }, [isOpen, initialStartNo, initialStartInclination]);
+    }, [isOpen, initialStartNo, initialStartInclination, initialInsertGenkyo, initialInsertAllGenba]);
 
     if (!isOpen) return null;
 
@@ -38,6 +46,8 @@ export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
         onSelectFormat(format, {
             startNo: parsedNo,
             startInclination: startInclination || 'A',
+            insertGenkyo,
+            insertAllGenba,
         });
     };
 
@@ -148,6 +158,83 @@ export const CopyFormatModal: React.FC<CopyFormatModalProps> = ({
                     <p style={{ fontSize: '0.9rem', color: '#444' }}>
                         クリップボードにコピーする区切り文字の形式を選択してください。
                     </p>
+
+                    {/* 全て現場 & 現況挿入 チェックボックス（横並び） */}
+                    <div
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '8px',
+                            marginTop: '4px',
+                            marginBottom: '6px',
+                        }}
+                    >
+                        <label
+                            htmlFor="copy-insert-all-genba-checkbox"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 12px',
+                                backgroundColor: insertAllGenba ? '#eff6ff' : '#f8fafc',
+                                border: insertAllGenba ? '1.5px solid #3b82f6' : '1.5px solid #cbd5e1',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                transition: 'all 0.15s ease',
+                            }}
+                        >
+                            <input
+                                id="copy-insert-all-genba-checkbox"
+                                type="checkbox"
+                                checked={insertAllGenba}
+                                onChange={(e) => setInsertAllGenba(e.target.checked)}
+                                style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    cursor: 'pointer',
+                                    accentColor: '#0d6efd',
+                                    flexShrink: 0,
+                                }}
+                            />
+                            <span style={{ fontSize: '0.92rem', fontWeight: 'bold', color: insertAllGenba ? '#1d4ed8' : '#1e293b' }}>
+                                全て現場
+                            </span>
+                        </label>
+
+                        <label
+                            htmlFor="copy-insert-genkyo-checkbox"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                padding: '10px 12px',
+                                backgroundColor: insertGenkyo ? '#eff6ff' : '#f8fafc',
+                                border: insertGenkyo ? '1.5px solid #3b82f6' : '1.5px solid #cbd5e1',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                transition: 'all 0.15s ease',
+                            }}
+                        >
+                            <input
+                                id="copy-insert-genkyo-checkbox"
+                                type="checkbox"
+                                checked={insertGenkyo}
+                                onChange={(e) => setInsertGenkyo(e.target.checked)}
+                                style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    cursor: 'pointer',
+                                    accentColor: '#0d6efd',
+                                    flexShrink: 0,
+                                }}
+                            />
+                            <span style={{ fontSize: '0.92rem', fontWeight: 'bold', color: insertGenkyo ? '#1d4ed8' : '#1e293b' }}>
+                                現況挿入
+                            </span>
+                        </label>
+                    </div>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
                         <button

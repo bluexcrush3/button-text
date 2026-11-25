@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineData, BasicInfo } from '../types';
-import { generateLineText, generateAllLinesTextForSpreadsheet, generateAllLinesTextForSpreadsheetOptimized, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
+import { generateLineText, generateAllLinesTextForSpreadsheet, generateAllLinesTextForSpreadsheetOptimized, applyGenkyoToEmptyDamageLines, applyGenbaToEmptySituationLines, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
 import { FileText, Copy, Check, X, WrapText } from 'lucide-react';
 import { CopyFormatModal, CopyFormatType } from './CopyFormatModal';
 
@@ -30,6 +30,8 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [copyStartNo, setCopyStartNo] = useState<number>(1);
   const [copyStartInclination, setCopyStartInclination] = useState<string>('A');
+  const [copyInsertGenkyo, setCopyInsertGenkyo] = useState<boolean>(false);
+  const [copyInsertAllGenba, setCopyInsertAllGenba] = useState<boolean>(false);
 
   if (!isOpen) return null;
 
@@ -44,8 +46,16 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
     try {
       setCopyStartNo(copyOptions.startNo);
       setCopyStartInclination(copyOptions.startInclination);
+      setCopyInsertGenkyo(Boolean(copyOptions.insertGenkyo));
+      setCopyInsertAllGenba(Boolean(copyOptions.insertAllGenba));
 
-      const validLines = lines.filter((line) => hasLineInput(line.selection, customButtons));
+      let validLines = lines.filter((line) => hasLineInput(line.selection, customButtons));
+      if (copyOptions.insertAllGenba) {
+        validLines = applyGenbaToEmptySituationLines(validLines);
+      }
+      if (copyOptions.insertGenkyo) {
+        validLines = applyGenkyoToEmptyDamageLines(validLines, customButtons, basicInfo?.surveyType);
+      }
 
       let copyText = '';
       if (delimiter === 'spreadsheet_optimized') {
@@ -227,6 +237,8 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
         onSelectFormat={handleSelectFormatAndCopy}
         initialStartNo={copyStartNo}
         initialStartInclination={copyStartInclination}
+        initialInsertGenkyo={copyInsertGenkyo}
+        initialInsertAllGenba={copyInsertAllGenba}
       />
     </>
   );

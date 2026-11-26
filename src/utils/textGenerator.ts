@@ -654,6 +654,27 @@ export function applyGenbaToEmptySituationLines(lines: LineData[]): LineData[] {
 }
 
 /**
+ * 損傷グループが未入力かどうかを判定する（傾斜モードは対象外として false を返す）
+ */
+export function isDamageGroupEmpty(
+  selection: LineSelection,
+  customButtonsInput: CustomButtonsInput = [],
+  defaultSurveyType?: SurveyType
+): boolean {
+  const isInc =
+    selection.mode === '傾斜' ||
+    (!selection.mode && defaultSurveyType === '傾斜');
+  if (isInc) return false;
+
+  const comp = getLineComponents(selection, customButtonsInput);
+  const hasDamage =
+    (comp.damageItems && comp.damageItems.length > 0) ||
+    Boolean(selection.situationButton);
+
+  return !hasDamage;
+}
+
+/**
  * 損傷グループが未入力の全ての行に対して「現況」を設定した行配列を返す（傾斜モードは対象外）
  */
 export function applyGenkyoToEmptyDamageLines(
@@ -662,17 +683,7 @@ export function applyGenkyoToEmptyDamageLines(
   defaultSurveyType?: SurveyType
 ): LineData[] {
   return lines.map((line) => {
-    const isInc =
-      line.selection.mode === '傾斜' ||
-      (!line.selection.mode && defaultSurveyType === '傾斜');
-    if (isInc) return line;
-
-    const comp = getLineComponents(line.selection, customButtonsInput);
-    const hasDamage =
-      (comp.damageItems && comp.damageItems.length > 0) ||
-      Boolean(line.selection.situationButton);
-
-    if (!hasDamage) {
+    if (isDamageGroupEmpty(line.selection, customButtonsInput, defaultSurveyType)) {
       return {
         ...line,
         selection: {

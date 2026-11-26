@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LineData, BasicInfo } from '../types';
-import { generateLineText, generateAllLinesTextForSpreadsheet, generateAllLinesTextForSpreadsheetOptimized, applyGenkyoToEmptyDamageLines, applyGenbaToEmptySituationLines, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
+import { generateLineText, generateAllLinesTextForSpreadsheet, generateAllLinesTextForSpreadsheetOptimized, applyGenkyoToEmptyDamageLines, applyGenbaToEmptySituationLines, isDamageGroupEmpty, formatBasicInfoHeader, hasLineInput, CustomButtonsInput, CopyNumberOptions } from '../utils/textGenerator';
 import { FileText, Copy, Check, X, WrapText } from 'lucide-react';
 import { CopyFormatModal, CopyFormatType } from './CopyFormatModal';
 
@@ -148,6 +148,7 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
               {lines.map((line, idx) => {
                 const text = lineTexts[idx];
                 const isCurrent = idx === currentLineIndex;
+                const isMissingDamage = Boolean(text) && isDamageGroupEmpty(line.selection, customButtons, basicInfo?.surveyType);
 
                 return (
                   <div
@@ -156,8 +157,16 @@ export const AllTextModal: React.FC<AllTextModalProps> = ({
                     style={{
                       padding: '8px 10px',
                       borderRadius: '6px',
-                      border: isCurrent ? '2px solid #0d6efd' : '1px solid #ddd',
-                      backgroundColor: isCurrent ? '#eef6ff' : '#ffffff',
+                      border: isMissingDamage
+                        ? '2px solid #dc3545'
+                        : isCurrent
+                          ? '2px solid #0d6efd'
+                          : '1px solid #ddd',
+                      backgroundColor: isCurrent
+                        ? '#eef6ff'
+                        : isMissingDamage
+                          ? '#fff5f5'
+                          : '#ffffff',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: isWrapText ? 'flex-start' : 'center',
